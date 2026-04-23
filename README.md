@@ -2,7 +2,7 @@
 
 This sample contains a basic three.js scene integrated with the 8th Wall Engine Binary.
 
-![Virtual cube aligned to the floor of a room](./src/assets/preview.jpg)
+![Virtual cube aligned to the floor of a room](./public/preview.jpg)
 
 <details><summary>Try it out</summary>
 
