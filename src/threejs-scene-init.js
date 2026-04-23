@@ -1,6 +1,8 @@
 // Define an 8th Wall XR Camera Pipeline Module that adds a cube to a threejs scene on startup.
 import * as THREE from 'three';
 
+import cubeTexture from './assets/cube-texture.png'
+
 export const initScenePipelineModule = () => {
   const purple = 0xAD50FF
 
@@ -19,7 +21,7 @@ export const initScenePipelineModule = () => {
     const material = new THREE.MeshBasicMaterial()
     material.side = THREE.DoubleSide
     material.map = new THREE.TextureLoader().load(
-      'https://cdn.8thwall.com/web/assets/cube-texture.png'
+      cubeTexture
     )
     material.color = new THREE.Color(0xAD50FF)
 

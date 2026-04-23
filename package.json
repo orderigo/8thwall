@@ -1,4 +1,5 @@
 {
+  "name": "threejs-world-effects-example",
   "scripts": {
     "serve": "vite",
     "build": "vite build",

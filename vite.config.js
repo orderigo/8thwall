@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  base: '/threejs-world-effects-example/',
+  base: './',
   server: {
     allowedHosts: ['.ngrok-free.dev'],
   },
