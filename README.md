@@ -39,6 +39,24 @@ Create an AR learning experience where users open magic portals to places around
 - Animated portal ring, rune marks, particles, and glowing destination window are created in `src/threejs-scene-init.js`.
 - The Portal LLM Agent UI is created in `src/app.js` and styled in `src/index.css`.
 - Tap the AR canvas to recenter tracking and cycle to the next destination.
+- Walk through the portal threshold with the phone to fade into the 360 destination room.
+
+
+## Portal Entry Technology Recommendation
+
+For this project, use a **hybrid rendering strategy**:
+
+1. **MVP / broad phone support: 360 image or 360 video skybox.** This is the best first step for a web-based 8th Wall experience because it loads quickly, works on more phones, and makes the “walk through the portal” interaction feel immediate.
+2. **Premium location mode: Gaussian splatting / point-cloud-style 3D capture.** Gaussian splats are the better latest-generation technique when you need realistic depth, parallax, reflections, and a stronger sense of physically standing in the place. Use it for hero destinations after performance testing and optimization.
+3. **Fallback: lightweight mesh + hotspots.** For slower devices, keep the 360 skybox and add simple 3D hotspot markers rather than forcing a heavy full-scene reconstruction.
+
+### Why not point cloud only?
+
+Traditional point clouds can look sparse on mobile and often need custom shaders, large files, and careful occlusion handling. Gaussian splatting is generally the more modern choice for photoreal reconstructed places, while a 360 skybox remains the safest first implementation for WebAR performance.
+
+### Walk-through Behavior Implemented
+
+The prototype now detects when the phone camera gets close to the portal. When the user physically walks forward through the portal threshold, the app fades in a procedural 360 destination room around the camera. When the user walks back out, the 360 room fades away and the AR portal remains anchored in the real world.
 
 ## Usage
 

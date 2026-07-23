@@ -61,6 +61,55 @@ const makeTextTexture = (title, lines, accentColor = '#ffb04f') => {
   return texture
 }
 
+const makePanoramaTexture = (destination) => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 2048
+  canvas.height = 1024
+  const context = canvas.getContext('2d')
+
+  const sky = context.createLinearGradient(0, 0, 0, 1024)
+  sky.addColorStop(0, '#07142d')
+  sky.addColorStop(0.42, '#25416e')
+  sky.addColorStop(0.7, '#f0a35c')
+  sky.addColorStop(1, '#1b1b24')
+  context.fillStyle = sky
+  context.fillRect(0, 0, 2048, 1024)
+
+  context.fillStyle = 'rgba(255, 255, 255, 0.62)'
+  for (let i = 0; i < 120; i++) {
+    const x = (i * 97) % 2048
+    const y = 35 + ((i * 53) % 330)
+    context.fillRect(x, y, 2, 2)
+  }
+
+  context.fillStyle = `#${destination.color.toString(16).padStart(6, '0')}`
+  for (let i = 0; i < 18; i++) {
+    const x = i * 130 - 90
+    const height = 170 + ((i * 47) % 260)
+    context.beginPath()
+    context.moveTo(x, 820)
+    context.lineTo(x + 82, 820 - height)
+    context.lineTo(x + 164, 820)
+    context.closePath()
+    context.fill()
+  }
+
+  context.fillStyle = 'rgba(4, 8, 18, 0.72)'
+  context.fillRect(0, 820, 2048, 204)
+
+  context.fillStyle = '#ffffff'
+  context.font = '800 92px sans-serif'
+  context.textAlign = 'center'
+  context.fillText(destination.name, 1024, 520)
+
+  context.font = '500 42px sans-serif'
+  context.fillText('360 preview room — premium mode can swap this for Gaussian splat capture', 1024, 590)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
 const createPortal = () => {
   const group = new THREE.Group()
   group.name = 'slam-magic-travel-portal'
@@ -124,7 +173,7 @@ const createPortal = () => {
   return group
 }
 
-const updateDestination = (portal) => {
+const updateDestination = (portal, panoramaRoom) => {
   const nextIndex = (portal.userData.destinationIndex + 1) % DESTINATIONS.length
   const destination = DESTINATIONS[nextIndex]
   portal.userData.destinationIndex = nextIndex
@@ -136,6 +185,9 @@ const updateDestination = (portal) => {
   )
   portal.userData.innerMaterial.needsUpdate = true
   portal.userData.outerRing.material.color.set(destination.color)
+  panoramaRoom.material.map.dispose()
+  panoramaRoom.material.map = makePanoramaTexture(destination)
+  panoramaRoom.material.needsUpdate = true
 
   window.dispatchEvent(new CustomEvent('portal-destination-change', {detail: destination}))
 }
@@ -143,6 +195,8 @@ const updateDestination = (portal) => {
 export const initScenePipelineModule = () => {
   const clock = new THREE.Clock()
   let portal
+  let panoramaRoom
+  let isInsidePortal = false
 
   const initXrScene = ({scene, camera, renderer}) => {
     renderer.shadowMap.enabled = true
@@ -155,6 +209,19 @@ export const initScenePipelineModule = () => {
     directionalLight.position.set(3, 6, 4)
     directionalLight.castShadow = true
     scene.add(directionalLight)
+
+    panoramaRoom = new THREE.Mesh(
+      new THREE.SphereGeometry(18, 64, 32),
+      new THREE.MeshBasicMaterial({
+        map: makePanoramaTexture(DESTINATIONS[0]),
+        side: THREE.BackSide,
+        transparent: true,
+        opacity: 0,
+      })
+    )
+    panoramaRoom.name = 'walk-through-360-destination-room'
+    panoramaRoom.visible = true
+    scene.add(panoramaRoom)
 
     const portalLight = new THREE.PointLight(0xffa640, 2.2, 4)
     portalLight.position.set(0, 1.35, -2.6)
@@ -192,7 +259,7 @@ export const initScenePipelineModule = () => {
         'touchstart', (event) => {
           if (event.touches.length === 1) {
             XR8.XrController.recenter()
-            updateDestination(portal)
+            updateDestination(portal, panoramaRoom)
           }
         }, true
       )
@@ -201,7 +268,23 @@ export const initScenePipelineModule = () => {
     onUpdate: () => {
       if (!portal) return
 
+      const {camera} = XR8.Threejs.xrScene()
       const elapsed = clock.getElapsedTime()
+      const distanceToPortal = camera.position.distanceTo(portal.position)
+      const shouldBeInsidePortal = distanceToPortal < 1.25
+
+      if (shouldBeInsidePortal !== isInsidePortal) {
+        isInsidePortal = shouldBeInsidePortal
+        window.dispatchEvent(new CustomEvent('portal-entry-change', {detail: {isInsidePortal}}))
+      }
+
+      panoramaRoom.position.copy(camera.position)
+      panoramaRoom.material.opacity = THREE.MathUtils.lerp(
+        panoramaRoom.material.opacity,
+        isInsidePortal ? 1 : 0,
+        0.12
+      )
+
       portal.userData.outerRing.rotation.z = elapsed * 0.85
       portal.userData.runeGroup.rotation.z = -elapsed * 0.55
       portal.userData.sparks.rotation.z = elapsed * 0.32
