@@ -1,40 +1,74 @@
-# three.js: World Effects (SLAM)
+# 8th Wall Magic Portal Travel Guide
 
-This sample contains a basic three.js scene integrated with the 8th Wall Engine Binary.
+This project uses 8th Wall SLAM tracking with three.js to pin a Dr. Strange-inspired magic portal into the real world. The first prototype lets a visitor tap the portal to rotate through world destinations and ask a lightweight Portal LLM Agent mock UI for guidance.
 
 ![Virtual cube aligned to the floor of a room](./public/preview.jpg)
 
-<details><summary>Try it out</summary>
+## Idea Plan
 
-https://8thwall.org/threejs-world-effects-example/
+### Vision
 
-<img alt="QR Code for the preview link" src="https://8th.io/qr?v=2&url=https://8thwall.org/threejs-world-effects-example/" width=250 height=250 />
+Create an AR learning experience where users open magic portals to places around the world, step closer, and ask an embedded LLM Agent about history, culture, travel tips, and visual landmarks.
 
-</details>
+### Experience Flow
+
+1. **SLAM placement** - 8th Wall world tracking anchors the portal in front of the user.
+2. **Magic portal reveal** - Animated rings, runes, sparks, and a destination window make the space feel like a magical doorway.
+3. **Destination browsing** - Tapping the canvas recenters the AR scene and cycles the first destinations: Bagan, Kyoto, and Machu Picchu.
+4. **LLM Agent overlay** - A bottom panel shows the current destination and accepts user questions.
+5. **Contextual answers** - Next milestone is to send questions, destination metadata, and safety instructions to a hosted LLM endpoint.
+
+### LLM Agent Design
+
+- **Role**: Friendly travel-learning guide inside the portal.
+- **Inputs**: User question, selected destination, detected language, session age, and optional coordinates/content pack.
+- **Outputs**: Concise explanations, suggested things to notice, cultural etiquette, accessibility notes, and source-backed facts.
+- **Safety**: Refuse unsafe travel advice, avoid hallucinated live details, cite sources for historical claims, and clearly separate prototype content from live travel guidance.
+- **Future tools**: Retrieval over curated destination packs, translation, text-to-speech, image recognition, and itinerary builder.
+
+### Milestones
+
+- **MVP 1 - First Portal**: Build a SLAM-anchored animated portal with destination preview cards and an agent chat mock.
+- **MVP 2 - Real Agent**: Add a backend API route for LLM calls with destination context and moderation.
+- **MVP 3 - Content Packs**: Add structured destination JSON with images, narrated facts, and quiz prompts.
+- **MVP 4 - Spatial Interaction**: Add raycasting hotspots inside the portal and hand/tap interactions.
+- **MVP 5 - Multi-Portal Map**: Let users summon portals by region, theme, or learning objective.
+
+## Current Prototype
+
+- Animated portal ring, rune marks, particles, and glowing destination window are created in `src/threejs-scene-init.js`.
+- The Portal LLM Agent UI is created in `src/app.js` and styled in `src/index.css`.
+- Tap the AR canvas to recenter tracking and cycle to the next destination.
+- Walk through the portal threshold with the phone to fade into the 360 destination room.
+
+
+## Portal Entry Technology Recommendation
+
+For this project, use a **hybrid rendering strategy**:
+
+1. **MVP / broad phone support: 360 image or 360 video skybox.** This is the best first step for a web-based 8th Wall experience because it loads quickly, works on more phones, and makes the “walk through the portal” interaction feel immediate.
+2. **Premium location mode: Gaussian splatting / point-cloud-style 3D capture.** Gaussian splats are the better latest-generation technique when you need realistic depth, parallax, reflections, and a stronger sense of physically standing in the place. Use it for hero destinations after performance testing and optimization.
+3. **Fallback: lightweight mesh + hotspots.** For slower devices, keep the 360 skybox and add simple 3D hotspot markers rather than forcing a heavy full-scene reconstruction.
+
+### Why not point cloud only?
+
+Traditional point clouds can look sparse on mobile and often need custom shaders, large files, and careful occlusion handling. Gaussian splatting is generally the more modern choice for photoreal reconstructed places, while a 360 skybox remains the safest first implementation for WebAR performance.
+
+### Walk-through Behavior Implemented
+
+The prototype now detects when the phone camera gets close to the portal. When the user physically walks forward through the portal threshold, the app fades in a procedural 360 destination room around the camera. When the user walks back out, the 360 room fades away and the AR portal remains anchored in the real world.
 
 ## Usage
 
-1. On this repository, click **Code** > **Download ZIP**. If you clone the repository instead, make sure you have Git LFS installed and run `git lfs pull`
-2. Unzip the folder to the location you'd like to work in
-3. `npm install`
-4. `npm run serve`
-5. To connect to a mobile device, follow [these instructions](https://8th.io/test-on-mobile)
-6. Recommended: Track your files using [git](https://git-scm.com/about) to avoid losing progress
+1. Install dependencies: `npm install`
+2. Start the dev server: `npm run serve`
+3. To connect to a mobile device, follow [8th Wall's testing instructions](https://8th.io/test-on-mobile).
+4. Open the experience on a supported mobile browser and allow camera access.
 
 ## Deployment
 
-This project contains Github Actions configuration for deployment to Github Pages, which triggers automatically by pushing the `main` branch. You can also create a production build using `npm run build`, which outputs the production build to the `dist` folder, and publish to the web using [this guide](https://8thwall.org/docs/getting-started/publishing#self-hosting-your-project).
+Create a production build with `npm run build`, which outputs the app to the `dist` folder. Publish the generated files to your preferred static host.
 
-## Questions?
+## Notes
 
-Please raise any questions on [Github Discussions](https://github.com/orgs/8thwall/discussions) or join the [Discord](https://8th.io/discord) to connect with the community.
-
-## Note
-
-This project relies on the [8th Wall Engine](https://www.npmjs.com/package/@8thwall/engine-binary), [XRExtras](https://www.npmjs.com/package/@8thwall/xrextras), and [Landing Page](https://www.npmjs.com/package/@8thwall/landing-page) which are loaded as script tags in `index.html`.
-
-```
-<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
-<script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
-```
+This project relies on the [8th Wall Engine](https://www.npmjs.com/package/@8thwall/engine-binary), [XRExtras](https://www.npmjs.com/package/@8thwall/xrextras), and [Landing Page](https://www.npmjs.com/package/@8thwall/landing-page), which are loaded as script tags in `index.html`.

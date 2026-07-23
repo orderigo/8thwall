@@ -1,7 +1,121 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 body {
   overflow: hidden;
   width: 100%;
   height: 100%;
-  margin: -1px 0px 0px 0px !important;
+  margin: -1px 0 0 !important;
   padding: 0;
+  background: #030711;
+}
+
+#camerafeed {
+  display: block;
+}
+
+.agent-panel {
+  position: fixed;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 10;
+  width: min(92vw, 520px);
+  transform: translateX(-50%);
+  padding: 16px;
+  border: 1px solid rgba(255, 192, 95, 0.42);
+  border-radius: 24px;
+  color: #f8fbff;
+  background: linear-gradient(145deg, rgba(8, 14, 31, 0.82), rgba(58, 28, 88, 0.78));
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.44), inset 0 0 36px rgba(255, 176, 79, 0.11);
+  backdrop-filter: blur(16px);
+}
+
+.agent-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.agent-panel__status {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #ffb04f;
+  box-shadow: 0 0 18px #ffb04f, 0 0 34px rgba(255, 176, 79, 0.72);
+}
+
+.agent-panel__eyebrow,
+.agent-panel__destination,
+.agent-panel__log p {
+  margin: 0;
+}
+
+.agent-panel__eyebrow {
+  color: #ffc773;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.agent-panel h1 {
+  margin: 2px 0 0;
+  font-size: clamp(1.18rem, 4vw, 1.55rem);
+}
+
+.agent-panel__destination {
+  margin-top: 12px;
+  color: #dce7ff;
+}
+
+.agent-panel__log {
+  min-height: 62px;
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #edf5ff;
+  font-size: 0.92rem;
+  line-height: 1.42;
+}
+
+.agent-panel__form {
+  display: flex;
+  gap: 8px;
+}
+
+.agent-panel input,
+.agent-panel button {
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+}
+
+.agent-panel input {
+  min-width: 0;
+  flex: 1;
+  padding: 12px 14px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.34);
+  outline: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.agent-panel button {
+  padding: 12px 18px;
+  color: #211102;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffd67e, #ff8f2e);
+}
+
+.agent-panel[data-portal-state="inside"] {
+  border-color: rgba(124, 224, 255, 0.62);
+  background: linear-gradient(145deg, rgba(6, 24, 44, 0.86), rgba(38, 38, 104, 0.8));
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.48), inset 0 0 42px rgba(124, 224, 255, 0.16);
+}
+
+.agent-panel[data-portal-state="inside"] .agent-panel__status {
+  background: #7ce0ff;
+  box-shadow: 0 0 18px #7ce0ff, 0 0 34px rgba(124, 224, 255, 0.72);
 }
