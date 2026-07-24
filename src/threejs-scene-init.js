@@ -112,6 +112,11 @@ const makePanoramaTexture = (destination) => {
 }
 
 const LUMA_SPLAT_SOURCE = 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2'
+const MIN_PORTAL_SCALE = 0.35
+const PORTAL_ENTRY_RADIUS = 0.82
+const PORTAL_EXIT_RADIUS = 1.04
+const PORTAL_ENTRY_DEPTH = 0.12
+
 
 const createPortal = () => {
   const group = new THREE.Group()
@@ -203,6 +208,7 @@ export const initScenePipelineModule = () => {
   let lumaSplats
   let smoothedCameraPosition = new THREE.Vector3()
   let hasSmoothedCameraPosition = false
+  const cameraPortalPosition = new THREE.Vector3()
   let entryAudioContext
 
   const playPortalEntrySound = () => {
@@ -251,10 +257,12 @@ export const initScenePipelineModule = () => {
         side: THREE.BackSide,
         transparent: true,
         opacity: 0,
+        depthWrite: false,
       })
     )
     panoramaRoom.name = 'walk-through-360-destination-room'
-    panoramaRoom.visible = true
+    panoramaRoom.visible = false
+    panoramaRoom.renderOrder = -10
     scene.add(panoramaRoom)
 
     lumaSplats = new LumaSplatsThree({
@@ -272,8 +280,6 @@ export const initScenePipelineModule = () => {
     lumaSplats.onLoad = () => {
       lumaSplats.captureCubemap(renderer).then((capturedTexture) => {
         scene.environment = capturedTexture
-        scene.background = capturedTexture
-        scene.backgroundBlurriness = 0.5
       })
     }
 
@@ -289,8 +295,6 @@ export const initScenePipelineModule = () => {
     const plane = new THREE.Mesh(planeGeometry, new THREE.ShadowMaterial({opacity: 0.42}))
     plane.receiveShadow = true
     scene.add(plane)
-
-    camera.position.set(0, 2, 2)
   }
 
   return {
@@ -313,19 +317,14 @@ export const initScenePipelineModule = () => {
       canvas.addEventListener('touchmove', (event) => {
         event.preventDefault()
         if (event.touches.length === 2 && portal && pinchStartDistance > 0) {
-          const nextScale = THREE.MathUtils.clamp(
-            pinchStartScale * (getTouchDistance(event.touches) / pinchStartDistance),
-            0.55,
-            1.8
+          const nextScale = Math.max(
+            MIN_PORTAL_SCALE,
+            pinchStartScale * (getTouchDistance(event.touches) / pinchStartDistance)
           )
           portal.userData.baseScale = nextScale
           portal.scale.setScalar(nextScale)
         }
       }, {passive: false})
-
-      XR8.XrController.updateCameraProjectionMatrix(
-        {origin: camera.position, facing: camera.quaternion}
-      )
 
       canvas.addEventListener(
         'touchstart', (event) => {
@@ -354,10 +353,15 @@ export const initScenePipelineModule = () => {
         smoothedCameraPosition.lerp(camera.position, 0.18)
       }
 
-      const distanceToPortal = smoothedCameraPosition.distanceTo(portal.position)
-      const entryRadius = 1.06 * portal.userData.baseScale
-      const exitRadius = 1.42 * portal.userData.baseScale
-      const shouldBeInsidePortal = isInsidePortal ? distanceToPortal < exitRadius : distanceToPortal < entryRadius
+      portal.worldToLocal(cameraPortalPosition.copy(smoothedCameraPosition))
+      const portalPlaneDistance = cameraPortalPosition.z
+      const portalRadialDistance = Math.hypot(cameraPortalPosition.x, cameraPortalPosition.y)
+      const thresholdRadius = isInsidePortal ? PORTAL_EXIT_RADIUS : PORTAL_ENTRY_RADIUS
+      const isWithinPortalOpening = portalRadialDistance < thresholdRadius
+      const isBehindPortal = isInsidePortal
+        ? portalPlaneDistance < PORTAL_ENTRY_DEPTH
+        : portalPlaneDistance < -PORTAL_ENTRY_DEPTH
+      const shouldBeInsidePortal = isWithinPortalOpening && isBehindPortal
 
       if (shouldBeInsidePortal !== isInsidePortal) {
         isInsidePortal = shouldBeInsidePortal
@@ -366,6 +370,7 @@ export const initScenePipelineModule = () => {
       }
 
       panoramaRoom.position.copy(camera.position)
+      panoramaRoom.visible = panoramaRoom.material.opacity > 0.01 || isInsidePortal
       if (lumaSplats) {
         lumaSplats.visible = isInsidePortal
         lumaSplats.position.copy(camera.position).add(new THREE.Vector3(0, -0.45, -1.85).applyQuaternion(camera.quaternion))
