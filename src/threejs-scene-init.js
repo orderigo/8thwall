@@ -63,6 +63,7 @@ const makeTextTexture = (title, lines, accentColor = '#ffb04f') => {
 }
 
 const LUMA_SPLAT_SOURCE = 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2'
+const DEFAULT_PORTAL_SCALE = 2
 const MIN_PORTAL_SCALE = 0.35
 const PORTAL_ENTRY_RADIUS = 0.82
 const PORTAL_EXIT_RADIUS = 1.04
@@ -75,6 +76,7 @@ const createPortal = () => {
   const group = new THREE.Group()
   group.name = 'slam-magic-travel-portal'
   group.position.set(0, 1.35, -3.2)
+  group.scale.setScalar(DEFAULT_PORTAL_SCALE)
 
   const innerMaterial = new THREE.MeshBasicMaterial({
     map: makeTextTexture(DESTINATIONS[0].name, DESTINATIONS[0].facts, '#ffb04f'),
@@ -130,7 +132,15 @@ const createPortal = () => {
   pedestal.receiveShadow = true
   group.add(pedestal)
 
-  group.userData = {innerWorld, innerMaterial, outerRing, runeGroup, sparks, destinationIndex: 0, baseScale: 1}
+  group.userData = {
+    innerWorld,
+    innerMaterial,
+    outerRing,
+    runeGroup,
+    sparks,
+    destinationIndex: 0,
+    baseScale: DEFAULT_PORTAL_SCALE,
+  }
   return group
 }
 
