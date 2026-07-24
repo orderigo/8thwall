@@ -15,6 +15,7 @@ const buildAgentOverlay = () => {
   const panel = document.createElement('section')
   panel.className = 'agent-panel'
   panel.innerHTML = `
+    <button class="agent-panel__minimize" type="button" aria-expanded="true" aria-label="Minimize agent chat">Minimize</button>
     <div class="agent-panel__header">
       <span class="agent-panel__status"></span>
       <div>
@@ -33,10 +34,18 @@ const buildAgentOverlay = () => {
   `
   document.body.appendChild(panel)
 
+  const minimizeButton = panel.querySelector('.agent-panel__minimize')
   const destination = panel.querySelector('.agent-panel__destination strong')
   const log = panel.querySelector('.agent-panel__log')
   const form = panel.querySelector('.agent-panel__form')
   const input = panel.querySelector('input')
+
+  minimizeButton.addEventListener('click', () => {
+    const isMinimized = panel.classList.toggle('agent-panel--minimized')
+    minimizeButton.textContent = isMinimized ? 'Open' : 'Minimize'
+    minimizeButton.setAttribute('aria-expanded', String(!isMinimized))
+    minimizeButton.setAttribute('aria-label', isMinimized ? 'Open agent chat' : 'Minimize agent chat')
+  })
 
   window.addEventListener('portal-destination-change', (event) => {
     const name = event.detail.name
