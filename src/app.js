@@ -11,6 +11,64 @@ const destinationResponses = {
   'Machu Picchu, Peru': 'Machu Picchu portal is ready. Ask about Inca engineering, altitude prep, or trail planning.',
 }
 
+const buildHomePage = ({onExplore}) => {
+  const home = document.createElement('main')
+  home.className = 'home-page'
+  home.innerHTML = `
+    <div class="home-page__aurora home-page__aurora--one"></div>
+    <div class="home-page__aurora home-page__aurora--two"></div>
+    <section class="hero-card" aria-labelledby="hero-title">
+      <div class="hero-card__content">
+        <p class="hero-card__eyebrow">High Tech × Magic Travel</p>
+        <h1 id="hero-title">Open AR portals and explore worlds across the globe.</h1>
+        <p class="hero-card__copy">
+          Step into a cinematic portal chamber where intelligent travel guidance, glowing arcane energy,
+          and spatial AR combine to reveal destinations from Myanmar to Japan and Peru.
+        </p>
+        <div class="hero-card__actions">
+          <button class="hero-card__button" type="button">Explore Portal</button>
+          <span class="hero-card__hint">Launches the Original Portal View</span>
+        </div>
+      </div>
+      <div class="portal-preview" aria-hidden="true">
+        <div class="portal-preview__ring"></div>
+        <div class="portal-preview__core">
+          <span>Original<br>Portal</span>
+        </div>
+        <div class="portal-preview__orbit portal-preview__orbit--one"></div>
+        <div class="portal-preview__orbit portal-preview__orbit--two"></div>
+      </div>
+    </section>
+    <section class="feature-grid" aria-label="Portal features">
+      <article>
+        <span>01</span>
+        <h2>Arcane Gateway</h2>
+        <p>Magic-style runes and radiant energy introduce the immersive AR experience.</p>
+      </article>
+      <article>
+        <span>02</span>
+        <h2>Smart Guide</h2>
+        <p>An on-screen portal agent stays ready to answer destination questions.</p>
+      </article>
+      <article>
+        <span>03</span>
+        <h2>World Explorer</h2>
+        <p>Tap the portal to rotate global destinations, then walk through the threshold.</p>
+      </article>
+    </section>
+  `
+
+  home.querySelector('.hero-card__button').addEventListener('click', () => {
+    home.classList.add('home-page--exiting')
+    window.setTimeout(() => {
+      home.remove()
+      onExplore()
+    }, 420)
+  })
+
+  document.body.prepend(home)
+}
+
 const buildAgentOverlay = () => {
   const panel = document.createElement('section')
   panel.className = 'agent-panel'
@@ -19,13 +77,13 @@ const buildAgentOverlay = () => {
     <div class="agent-panel__header">
       <span class="agent-panel__status"></span>
       <div>
-        <p class="agent-panel__eyebrow">Portal LLM Agent</p>
+        <p class="agent-panel__eyebrow">Original Portal LLM Agent</p>
         <h1>Ask the guide</h1>
       </div>
     </div>
     <p class="agent-panel__destination">Destination: <strong>Bagan, Myanmar</strong></p>
     <div class="agent-panel__log" aria-live="polite">
-      <p><strong>Agent:</strong> Mingalarbar! Drag the portal to move it, pinch to scale it, tap to rotate destinations, then walk through to enter the Luma 3D environment.</p>
+      <p><strong>Agent:</strong> Welcome to the Original Portal. Drag to move it, pinch to scale it, tap to rotate destinations, then walk through to enter the Luma 3D environment.</p>
     </div>
     <form class="agent-panel__form">
       <input aria-label="Ask the portal guide" placeholder="e.g. What should I notice here?" />
@@ -54,7 +112,7 @@ const buildAgentOverlay = () => {
   })
 
   window.addEventListener('portal-entry-change', (event) => {
-    const status = event.detail.isInsidePortal ? 'Inside Luma 3D environment' : 'Portal threshold'
+    const status = event.detail.isInsidePortal ? 'Inside Luma 3D environment' : 'Original Portal threshold'
     panel.dataset.portalState = event.detail.isInsidePortal ? 'inside' : 'outside'
     panel.querySelector('h1').textContent = status
   })
@@ -72,8 +130,9 @@ const buildAgentOverlay = () => {
   })
 }
 
-const onxrloaded = () => {
+const startOriginalPortal = () => {
   buildAgentOverlay()
+  document.body.classList.add('original-portal-active')
 
   XR8.addCameraPipelineModules([
     XR8.GlTextureRenderer.pipelineModule(),
@@ -88,6 +147,10 @@ const onxrloaded = () => {
 
   const canvas = document.getElementById('camerafeed')
   XR8.run({canvas})
+}
+
+const onxrloaded = () => {
+  buildHomePage({onExplore: startOriginalPortal})
 }
 
 window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded)
