@@ -119,3 +119,40 @@ body {
   background: #7ce0ff;
   box-shadow: 0 0 18px #7ce0ff, 0 0 34px rgba(124, 224, 255, 0.72);
 }
+
+.agent-panel__minimize {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  color: #fff7e6;
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: rgba(0, 0, 0, 0.34);
+  box-shadow: none;
+}
+
+.agent-panel--minimized {
+  width: auto;
+  min-width: 174px;
+  padding: 12px 70px 12px 14px;
+  border-radius: 999px;
+}
+
+.agent-panel--minimized .agent-panel__header {
+  gap: 8px;
+}
+
+.agent-panel--minimized .agent-panel__eyebrow,
+.agent-panel--minimized .agent-panel__destination,
+.agent-panel--minimized .agent-panel__log,
+.agent-panel--minimized .agent-panel__form {
+  display: none;
+}
+
+.agent-panel--minimized h1 {
+  margin: 0;
+  font-size: 0.95rem;
+}

@@ -6,6 +6,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lumaai/luma-web": "^0.2.2",
     "three": "^0.183.2"
   },
   "devDependencies": {
