@@ -62,61 +62,14 @@ const makeTextTexture = (title, lines, accentColor = '#ffb04f') => {
   return texture
 }
 
-const makePanoramaTexture = (destination) => {
-  const canvas = document.createElement('canvas')
-  canvas.width = 2048
-  canvas.height = 1024
-  const context = canvas.getContext('2d')
-
-  const sky = context.createLinearGradient(0, 0, 0, 1024)
-  sky.addColorStop(0, '#07142d')
-  sky.addColorStop(0.42, '#25416e')
-  sky.addColorStop(0.7, '#f0a35c')
-  sky.addColorStop(1, '#1b1b24')
-  context.fillStyle = sky
-  context.fillRect(0, 0, 2048, 1024)
-
-  context.fillStyle = 'rgba(255, 255, 255, 0.62)'
-  for (let i = 0; i < 120; i++) {
-    const x = (i * 97) % 2048
-    const y = 35 + ((i * 53) % 330)
-    context.fillRect(x, y, 2, 2)
-  }
-
-  context.fillStyle = `#${destination.color.toString(16).padStart(6, '0')}`
-  for (let i = 0; i < 18; i++) {
-    const x = i * 130 - 90
-    const height = 170 + ((i * 47) % 260)
-    context.beginPath()
-    context.moveTo(x, 820)
-    context.lineTo(x + 82, 820 - height)
-    context.lineTo(x + 164, 820)
-    context.closePath()
-    context.fill()
-  }
-
-  context.fillStyle = 'rgba(4, 8, 18, 0.72)'
-  context.fillRect(0, 820, 2048, 204)
-
-  context.fillStyle = '#ffffff'
-  context.font = '800 92px sans-serif'
-  context.textAlign = 'center'
-  context.fillText(destination.name, 1024, 520)
-
-  context.font = '500 42px sans-serif'
-  context.fillText('360 preview room — premium mode can swap this for Gaussian splat capture', 1024, 590)
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  return texture
-}
-
 const LUMA_SPLAT_SOURCE = 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2'
 const MIN_PORTAL_SCALE = 0.35
 const PORTAL_ENTRY_RADIUS = 0.82
 const PORTAL_EXIT_RADIUS = 1.04
 const PORTAL_ENTRY_DEPTH = 0.12
-
+const PORTAL_DRAG_SENSITIVITY = 0.0038
+const MAX_TAP_MOVEMENT = 10
+const LUMA_SPLAT_SCALE = 0.58
 
 const createPortal = () => {
   const group = new THREE.Group()
@@ -181,7 +134,7 @@ const createPortal = () => {
   return group
 }
 
-const updateDestination = (portal, panoramaRoom) => {
+const updateDestination = (portal) => {
   const nextIndex = (portal.userData.destinationIndex + 1) % DESTINATIONS.length
   const destination = DESTINATIONS[nextIndex]
   portal.userData.destinationIndex = nextIndex
@@ -193,22 +146,19 @@ const updateDestination = (portal, panoramaRoom) => {
   )
   portal.userData.innerMaterial.needsUpdate = true
   portal.userData.outerRing.material.color.set(destination.color)
-  panoramaRoom.material.map.dispose()
-  panoramaRoom.material.map = makePanoramaTexture(destination)
-  panoramaRoom.material.needsUpdate = true
-
   window.dispatchEvent(new CustomEvent('portal-destination-change', {detail: destination}))
 }
 
 export const initScenePipelineModule = () => {
   const clock = new THREE.Clock()
   let portal
-  let panoramaRoom
   let isInsidePortal = false
   let lumaSplats
   let smoothedCameraPosition = new THREE.Vector3()
   let hasSmoothedCameraPosition = false
   const cameraPortalPosition = new THREE.Vector3()
+  const dragRight = new THREE.Vector3()
+  const dragUp = new THREE.Vector3()
   let entryAudioContext
 
   const playPortalEntrySound = () => {
@@ -250,30 +200,15 @@ export const initScenePipelineModule = () => {
     directionalLight.castShadow = true
     scene.add(directionalLight)
 
-    panoramaRoom = new THREE.Mesh(
-      new THREE.SphereGeometry(18, 64, 32),
-      new THREE.MeshBasicMaterial({
-        map: makePanoramaTexture(DESTINATIONS[0]),
-        side: THREE.BackSide,
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-      })
-    )
-    panoramaRoom.name = 'walk-through-360-destination-room'
-    panoramaRoom.visible = false
-    panoramaRoom.renderOrder = -10
-    scene.add(panoramaRoom)
-
     lumaSplats = new LumaSplatsThree({
       source: LUMA_SPLAT_SOURCE,
       loadingAnimationEnabled: false,
       enableThreeShaderIntegration: false,
     })
     lumaSplats.name = 'luma-gaussian-splat-destination'
-    lumaSplats.position.set(0, 1.12, -0.62)
+    lumaSplats.position.set(0, 1.35, -3.2)
     lumaSplats.rotation.y = Math.PI
-    lumaSplats.scale.setScalar(0.58)
+    lumaSplats.scale.setScalar(LUMA_SPLAT_SCALE)
     lumaSplats.visible = false
     scene.add(lumaSplats)
 
@@ -283,12 +218,12 @@ export const initScenePipelineModule = () => {
       })
     }
 
-    const portalLight = new THREE.PointLight(0xffa640, 2.2, 4)
-    portalLight.position.set(0, 1.35, -2.6)
-    scene.add(portalLight)
-
     portal = createPortal()
     scene.add(portal)
+
+    const portalLight = new THREE.PointLight(0xffa640, 2.2, 4)
+    portalLight.position.set(0, 0, 0.6)
+    portal.add(portalLight)
 
     const planeGeometry = new THREE.PlaneGeometry(2000, 2000)
     planeGeometry.rotateX(-Math.PI / 2)
@@ -307,6 +242,10 @@ export const initScenePipelineModule = () => {
 
       let pinchStartDistance = 0
       let pinchStartScale = 1
+      let activeTouchMode = 'none'
+      let dragLastX = 0
+      let dragLastY = 0
+      let dragTotalMovement = 0
 
       const getTouchDistance = (touches) => {
         const dx = touches[0].clientX - touches[1].clientX
@@ -316,29 +255,64 @@ export const initScenePipelineModule = () => {
 
       canvas.addEventListener('touchmove', (event) => {
         event.preventDefault()
+
         if (event.touches.length === 2 && portal && pinchStartDistance > 0) {
+          activeTouchMode = 'pinch'
           const nextScale = Math.max(
             MIN_PORTAL_SCALE,
             pinchStartScale * (getTouchDistance(event.touches) / pinchStartDistance)
           )
           portal.userData.baseScale = nextScale
           portal.scale.setScalar(nextScale)
+          return
+        }
+
+        if (event.touches.length === 1 && portal && activeTouchMode === 'drag' && !isInsidePortal) {
+          const touch = event.touches[0]
+          const deltaX = touch.clientX - dragLastX
+          const deltaY = touch.clientY - dragLastY
+          dragLastX = touch.clientX
+          dragLastY = touch.clientY
+          dragTotalMovement += Math.hypot(deltaX, deltaY)
+
+          const {camera} = XR8.Threejs.xrScene()
+          dragRight.set(1, 0, 0).applyQuaternion(camera.quaternion)
+          dragUp.set(0, 1, 0).applyQuaternion(camera.quaternion)
+          portal.position.addScaledVector(dragRight, deltaX * PORTAL_DRAG_SENSITIVITY)
+          portal.position.addScaledVector(dragUp, -deltaY * PORTAL_DRAG_SENSITIVITY)
+          portal.position.y = Math.max(0.35, portal.position.y)
+          lumaSplats.position.copy(portal.position)
         }
       }, {passive: false})
 
       canvas.addEventListener(
         'touchstart', (event) => {
           if (event.touches.length === 2) {
+            activeTouchMode = 'pinch'
             pinchStartDistance = getTouchDistance(event.touches)
             pinchStartScale = portal.userData.baseScale
             return
           }
 
           if (event.touches.length === 1) {
-            updateDestination(portal, panoramaRoom)
+            activeTouchMode = 'drag'
+            dragLastX = event.touches[0].clientX
+            dragLastY = event.touches[0].clientY
+            dragTotalMovement = 0
           }
         }, true
       )
+
+      canvas.addEventListener('touchend', (event) => {
+        if (activeTouchMode === 'drag' && event.touches.length === 0 && dragTotalMovement < MAX_TAP_MOVEMENT) {
+          updateDestination(portal)
+        }
+
+        if (event.touches.length === 0) {
+          activeTouchMode = 'none'
+          pinchStartDistance = 0
+        }
+      })
     },
 
     onUpdate: () => {
@@ -369,19 +343,10 @@ export const initScenePipelineModule = () => {
         if (isInsidePortal) playPortalEntrySound()
       }
 
-      panoramaRoom.position.copy(camera.position)
-      panoramaRoom.visible = panoramaRoom.material.opacity > 0.01 || isInsidePortal
       if (lumaSplats) {
         lumaSplats.visible = isInsidePortal
-        lumaSplats.position.copy(camera.position).add(new THREE.Vector3(0, -0.45, -1.85).applyQuaternion(camera.quaternion))
-        lumaSplats.quaternion.copy(camera.quaternion)
+        lumaSplats.position.copy(portal.position)
       }
-      panoramaRoom.material.opacity = THREE.MathUtils.lerp(
-        panoramaRoom.material.opacity,
-        isInsidePortal ? 1 : 0,
-        0.12
-      )
-
       portal.userData.outerRing.rotation.z = elapsed * 0.85
       portal.userData.runeGroup.rotation.z = -elapsed * 0.55
       portal.userData.sparks.rotation.z = elapsed * 0.32

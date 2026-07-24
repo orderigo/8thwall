@@ -25,7 +25,7 @@ const buildAgentOverlay = () => {
     </div>
     <p class="agent-panel__destination">Destination: <strong>Bagan, Myanmar</strong></p>
     <div class="agent-panel__log" aria-live="polite">
-      <p><strong>Agent:</strong> Mingalarbar! Tap to rotate destinations. Physically walk through the portal to enter a 360 preview room.</p>
+      <p><strong>Agent:</strong> Mingalarbar! Drag the portal to move it, pinch to scale it, tap to rotate destinations, then walk through to enter the Luma 3D environment.</p>
     </div>
     <form class="agent-panel__form">
       <input aria-label="Ask the portal guide" placeholder="e.g. What should I notice here?" />
@@ -54,7 +54,7 @@ const buildAgentOverlay = () => {
   })
 
   window.addEventListener('portal-entry-change', (event) => {
-    const status = event.detail.isInsidePortal ? 'Inside 360 room' : 'Portal threshold'
+    const status = event.detail.isInsidePortal ? 'Inside Luma 3D environment' : 'Portal threshold'
     panel.dataset.portalState = event.detail.isInsidePortal ? 'inside' : 'outside'
     panel.querySelector('h1').textContent = status
   })
