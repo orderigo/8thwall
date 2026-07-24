@@ -54,6 +54,16 @@ For this project, use a **hybrid rendering strategy**:
 
 Traditional point clouds can look sparse on mobile and often need custom shaders, large files, and careful occlusion handling. Gaussian splatting is generally the more modern choice for photoreal reconstructed places, while a 360 skybox remains the safest first implementation for WebAR performance.
 
+
+## Portal Improvement Brainstorm
+
+- **Auto-fit doorway mode**: keep the new 2x default portal size, then let the app gently resize the portal based on detected floor distance so it feels like a believable human-scale doorway on different devices.
+- **Guided placement preview**: show a translucent landing ring before the portal appears, with “too close,” “too far,” and “good spot” feedback to reduce awkward placement.
+- **Depth-aware threshold effects**: add a stronger rim glow, wind particles, and audio swell as the camera approaches the entry radius so users understand when walking forward will transition into the destination.
+- **Destination-specific portal skins**: vary rune shapes, particle colors, ambient sounds, and pedestal textures for Bagan, Kyoto, and Machu Picchu instead of changing only the inner card color.
+- **Agent-led discovery prompts**: after each destination change, surface 2–3 tappable question chips such as “What should I notice first?” or “Teach me a local etiquette tip.”
+- **Performance quality tiers**: detect device capability and choose between Gaussian splat, 360 skybox, or hotspot-only mode automatically.
+
 ### Walk-through Behavior Implemented
 
 The prototype now detects when the phone camera gets close to the portal. When the user physically walks forward through the portal threshold, the app fades in a procedural 360 destination room around the camera. When the user walks back out, the 360 room fades away and the AR portal remains anchored in the real world.
