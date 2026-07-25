@@ -83,7 +83,7 @@ const buildAgentOverlay = () => {
     </div>
     <p class="agent-panel__destination">Destination: <strong>Bagan, Myanmar</strong></p>
     <div class="agent-panel__tracking">
-      <p>CV SLAM: <strong>Stable</strong> <span>— ready to enter</span></p>
+      <p>8th Wall SLAM: <strong>Stable</strong> <span>— ready to enter</span></p>
       <button class="agent-panel__recenter" type="button">Recenter portal</button>
     </div>
     <div class="agent-panel__log" aria-live="polite">
@@ -129,13 +129,9 @@ const buildAgentOverlay = () => {
     }
     panel.dataset.trackingState = event.detail.state
     tracking.querySelector('strong').textContent = labels[event.detail.state]
-    if (!event.detail.canEnter) {
-      tracking.querySelector('span').textContent = '— scan textured surfaces before entering'
-    } else if (event.detail.state === 'stable') {
-      tracking.querySelector('span').textContent = '— ready to enter'
-    } else {
-      tracking.querySelector('span').textContent = '— enter slowly; tracking is recovering'
-    }
+    tracking.querySelector('span').textContent = event.detail.canEnter
+      ? '— ready to enter'
+      : '— waiting for 8th Wall SLAM tracking'
   })
 
   window.addEventListener('portal-entry-change', (event) => {
