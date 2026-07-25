@@ -299,6 +299,7 @@ body {
 
 .agent-panel__eyebrow,
 .agent-panel__destination,
+.agent-panel__tracking,
 .agent-panel__log p {
   margin: 0;
 }
@@ -319,6 +320,41 @@ body {
 .agent-panel__destination {
   margin-top: 12px;
   color: #dce7ff;
+}
+
+.agent-panel__tracking {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  color: #b8c9e8;
+  font-size: 0.84rem;
+}
+
+.agent-panel__tracking p {
+  margin: 0;
+}
+
+.agent-panel__tracking strong {
+  color: #8fffc4;
+}
+
+.agent-panel__recenter {
+  flex: none;
+  padding: 8px 10px;
+  border: 1px solid rgba(124, 224, 255, 0.32);
+  color: #eafdff;
+  font-size: 0.76rem;
+  background: rgba(124, 224, 255, 0.12);
+}
+
+.agent-panel[data-tracking-state="recovering"] .agent-panel__tracking strong {
+  color: #ffd67e;
+}
+
+.agent-panel[data-tracking-state="limited"] .agent-panel__tracking strong {
+  color: #ff8a8a;
 }
 
 .agent-panel__log {
@@ -398,6 +434,7 @@ body {
 
 .agent-panel--minimized .agent-panel__eyebrow,
 .agent-panel--minimized .agent-panel__destination,
+.agent-panel--minimized .agent-panel__tracking,
 .agent-panel--minimized .agent-panel__log,
 .agent-panel--minimized .agent-panel__form {
   display: none;

@@ -68,6 +68,13 @@ const MIN_PORTAL_SCALE = 0.35
 const PORTAL_ENTRY_RADIUS = 0.82
 const PORTAL_EXIT_RADIUS = 1.04
 const PORTAL_ENTRY_DEPTH = 0.12
+const TRACKING_SAMPLE_LIMIT = 60
+const TRACKING_STABLE_SCORE = 0.74
+const TRACKING_RECOVERY_SCORE = 0.52
+const TRACKING_STATE_HOLD_SECONDS = 0.8
+const TRACKING_STATUS_INTERVAL_SECONDS = 0.5
+const TRACKING_ENTRY_RADIUS_BOOST = 0.1
+const MAX_ENTRY_SPEED = 0.18
 const PORTAL_DRAG_SENSITIVITY = 0.0038
 const MAX_TAP_MOVEMENT = 10
 const LUMA_SPLAT_SCALE = 0.58
@@ -170,6 +177,45 @@ export const initScenePipelineModule = () => {
   const dragRight = new THREE.Vector3()
   const dragUp = new THREE.Vector3()
   let entryAudioContext
+  const trackingSamples = []
+  const previousCameraPosition = new THREE.Vector3()
+  let hasPreviousCameraPosition = false
+  let trackingScore = 1
+  let trackingState = 'stable'
+  let trackingStateChangedAt = 0
+  let lastTrackingStatusAt = -Infinity
+  let averageCameraMotion = 0
+
+  const dispatchTrackingStatus = (force = false) => {
+    const elapsed = clock.getElapsedTime()
+    if (!force && elapsed - lastTrackingStatusAt < TRACKING_STATUS_INTERVAL_SECONDS) return
+
+    lastTrackingStatusAt = elapsed
+    window.dispatchEvent(new CustomEvent('portal-tracking-change', {
+      detail: {
+        canEnter: trackingState !== 'limited' && averageCameraMotion <= MAX_ENTRY_SPEED,
+        score: trackingScore,
+        state: trackingState,
+      },
+    }))
+  }
+
+  const placePortalInFrontOfCamera = () => {
+    if (!portal) return
+
+    const {camera} = XR8.Threejs.xrScene()
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+    const target = camera.position.clone().addScaledVector(forward, 3.2)
+    portal.position.set(target.x, Math.max(1.05, target.y), target.z)
+    portal.quaternion.copy(camera.quaternion)
+    portal.rotation.x = 0
+    portal.rotation.z = 0
+    if (lumaSplats) {
+      lumaSplats.position.copy(portal.position)
+      lumaSplats.rotation.y = portal.rotation.y + Math.PI
+    }
+    dispatchTrackingStatus(true)
+  }
 
   const playPortalEntrySound = () => {
     const AudioContext = window.AudioContext || window.webkitAudioContext
@@ -313,6 +359,9 @@ export const initScenePipelineModule = () => {
         }, true
       )
 
+      window.addEventListener('portal-recenter-request', placePortalInFrontOfCamera)
+      dispatchTrackingStatus(true)
+
       canvas.addEventListener('touchend', (event) => {
         if (activeTouchMode === 'drag' && event.touches.length === 0 && dragTotalMovement < MAX_TAP_MOVEMENT) {
           updateDestination(portal)
@@ -337,15 +386,45 @@ export const initScenePipelineModule = () => {
         smoothedCameraPosition.lerp(camera.position, 0.18)
       }
 
+      if (hasPreviousCameraPosition) {
+        const frameDistance = camera.position.distanceTo(previousCameraPosition)
+        trackingSamples.push(frameDistance)
+        if (trackingSamples.length > TRACKING_SAMPLE_LIMIT) trackingSamples.shift()
+
+        averageCameraMotion = trackingSamples.reduce((total, sample) => total + sample, 0) / trackingSamples.length
+        const jitter = trackingSamples.reduce((total, sample) => total + Math.abs(sample - averageCameraMotion), 0) / trackingSamples.length
+        const speedPenalty = Math.max(0, averageCameraMotion - 0.06) * 5.5
+        const jitterPenalty = jitter * 36
+        trackingScore = THREE.MathUtils.clamp(1 - (jitterPenalty + speedPenalty), 0, 1)
+      }
+      previousCameraPosition.copy(camera.position)
+      hasPreviousCameraPosition = true
+
+      const nextTrackingState = trackingScore > TRACKING_STABLE_SCORE
+        ? 'stable'
+        : trackingScore > TRACKING_RECOVERY_SCORE
+          ? 'recovering'
+          : 'limited'
+
+      if (nextTrackingState !== trackingState && elapsed - trackingStateChangedAt > TRACKING_STATE_HOLD_SECONDS) {
+        trackingState = nextTrackingState
+        trackingStateChangedAt = elapsed
+        dispatchTrackingStatus(true)
+      } else {
+        dispatchTrackingStatus()
+      }
+
       portal.worldToLocal(cameraPortalPosition.copy(smoothedCameraPosition))
       const portalPlaneDistance = cameraPortalPosition.z
       const portalRadialDistance = Math.hypot(cameraPortalPosition.x, cameraPortalPosition.y)
-      const thresholdRadius = isInsidePortal ? PORTAL_EXIT_RADIUS : PORTAL_ENTRY_RADIUS
+      const canEnterPortal = trackingState !== 'limited' && averageCameraMotion <= MAX_ENTRY_SPEED
+      const trackingEntryBoost = trackingState === 'recovering' ? TRACKING_ENTRY_RADIUS_BOOST : 0
+      const thresholdRadius = (isInsidePortal ? PORTAL_EXIT_RADIUS : PORTAL_ENTRY_RADIUS) + trackingEntryBoost
       const isWithinPortalOpening = portalRadialDistance < thresholdRadius
       const isBehindPortal = isInsidePortal
         ? portalPlaneDistance < PORTAL_ENTRY_DEPTH
         : portalPlaneDistance < -PORTAL_ENTRY_DEPTH
-      const shouldBeInsidePortal = isWithinPortalOpening && isBehindPortal
+      const shouldBeInsidePortal = canEnterPortal && isWithinPortalOpening && isBehindPortal
 
       if (shouldBeInsidePortal !== isInsidePortal) {
         isInsidePortal = shouldBeInsidePortal
@@ -357,6 +436,10 @@ export const initScenePipelineModule = () => {
         lumaSplats.visible = isInsidePortal
         lumaSplats.position.copy(portal.position)
       }
+      const portalConfidencePulse = trackingState === 'stable' ? 1 : 1 + Math.sin(elapsed * 9) * 0.035
+      portal.scale.setScalar(portal.userData.baseScale * portalConfidencePulse)
+      portal.userData.outerRing.material.opacity = trackingState === 'limited' ? 0.58 : 0.9
+      portal.userData.innerMaterial.opacity = trackingState === 'limited' ? 0.72 : 0.94
       portal.userData.outerRing.rotation.z = elapsed * 0.85
       portal.userData.runeGroup.rotation.z = -elapsed * 0.55
       portal.userData.sparks.rotation.z = elapsed * 0.32
