@@ -2,6 +2,7 @@
 // travel portal into the SLAM-tracked world and keeps it animated with three.js.
 import * as THREE from 'three'
 import {LumaSplatsThree} from '@lumaai/luma-web'
+import {AgentVideo} from './agentvideo'
 
 const DESTINATIONS = [
   {
@@ -171,6 +172,7 @@ export const initScenePipelineModule = () => {
   let portal
   let isInsidePortal = false
   let lumaSplats
+  let agentVideo
   let smoothedCameraPosition = new THREE.Vector3()
   let hasSmoothedCameraPosition = false
   const cameraPortalPosition = new THREE.Vector3()
@@ -276,6 +278,9 @@ export const initScenePipelineModule = () => {
 
     portal = createPortal()
     scene.add(portal)
+
+    agentVideo = new AgentVideo()
+    agentVideo.addToPortal(portal)
 
     const portalLight = new THREE.PointLight(0xffa640, 2.2, 4)
     portalLight.position.set(0, 0, 0.6)
@@ -429,6 +434,7 @@ export const initScenePipelineModule = () => {
       if (shouldBeInsidePortal !== isInsidePortal) {
         isInsidePortal = shouldBeInsidePortal
         window.dispatchEvent(new CustomEvent('portal-entry-change', {detail: {isInsidePortal}}))
+        if (agentVideo) agentVideo.setActive(isInsidePortal)
         if (isInsidePortal) playPortalEntrySound()
       }
 
@@ -444,6 +450,7 @@ export const initScenePipelineModule = () => {
       portal.userData.runeGroup.rotation.z = -elapsed * 0.55
       portal.userData.sparks.rotation.z = elapsed * 0.32
       portal.userData.innerWorld.scale.setScalar(1 + Math.sin(elapsed * 2.4) * 0.018)
+      if (agentVideo) agentVideo.update(camera)
     },
   }
 }
