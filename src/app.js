@@ -82,6 +82,10 @@ const buildAgentOverlay = () => {
       </div>
     </div>
     <p class="agent-panel__destination">Destination: <strong>Bagan, Myanmar</strong></p>
+    <div class="agent-panel__tracking">
+      <p>CV SLAM: <strong>Stable</strong> <span>— ready to enter</span></p>
+      <button class="agent-panel__recenter" type="button">Recenter portal</button>
+    </div>
     <div class="agent-panel__log" aria-live="polite">
       <p><strong>Agent:</strong> Welcome to the Original Portal. Drag to move it, pinch to scale it, tap to rotate destinations, then walk through to enter the Luma 3D environment.</p>
     </div>
@@ -95,6 +99,8 @@ const buildAgentOverlay = () => {
   const minimizeButton = panel.querySelector('.agent-panel__minimize')
   const destination = panel.querySelector('.agent-panel__destination strong')
   const log = panel.querySelector('.agent-panel__log')
+  const tracking = panel.querySelector('.agent-panel__tracking')
+  const recenterButton = panel.querySelector('.agent-panel__recenter')
   const form = panel.querySelector('.agent-panel__form')
   const input = panel.querySelector('input')
 
@@ -105,10 +111,31 @@ const buildAgentOverlay = () => {
     minimizeButton.setAttribute('aria-label', isMinimized ? 'Open agent chat' : 'Minimize agent chat')
   })
 
+  recenterButton.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('portal-recenter-request'))
+  })
+
   window.addEventListener('portal-destination-change', (event) => {
     const name = event.detail.name
     destination.textContent = name
     log.innerHTML = `<p><strong>Agent:</strong> ${destinationResponses[name]}</p>`
+  })
+
+  window.addEventListener('portal-tracking-change', (event) => {
+    const labels = {
+      stable: 'Stable',
+      recovering: 'Recovering',
+      limited: 'Limited',
+    }
+    panel.dataset.trackingState = event.detail.state
+    tracking.querySelector('strong').textContent = labels[event.detail.state]
+    if (!event.detail.canEnter) {
+      tracking.querySelector('span').textContent = '— scan textured surfaces before entering'
+    } else if (event.detail.state === 'stable') {
+      tracking.querySelector('span').textContent = '— ready to enter'
+    } else {
+      tracking.querySelector('span').textContent = '— enter slowly; tracking is recovering'
+    }
   })
 
   window.addEventListener('portal-entry-change', (event) => {

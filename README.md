@@ -68,6 +68,20 @@ Traditional point clouds can look sparse on mobile and often need custom shaders
 
 The prototype now detects when the phone camera gets close to the portal. When the user physically walks forward through the portal threshold, the app fades in a procedural 360 destination room around the camera. When the user walks back out, the 360 room fades away and the AR portal remains anchored in the real world.
 
+### SLAM + Computer Vision Portal Stability
+
+Yes, the portal combines 8th Wall world tracking with a production-oriented tracking confidence guard so visitors can physically walk into the portal without letting a low-confidence pose trigger a bad transition. The app samples camera pose motion over a rolling window, scores motion jitter and speed, debounces tracking-state changes, and exposes stable, recovering, or limited states to the guide overlay.
+
+When tracking confidence drops, the portal gives the visitor recovery guidance, gently pulses the doorway, dims portal content to signal caution, and blocks entry while tracking is limited. In recovering mode, the entry radius becomes slightly more forgiving, but full portal entry still requires the visitor to slow down. A recenter control lets the visitor place the portal back in front of the camera after relocation or drift.
+
+Production hardening checklist:
+
+- Wire vendor-level 8th Wall tracking-status callbacks into the same `portal-tracking-change` event shape when the deployed workspace exposes them.
+- Use image targets, VPS, or cloud/localization anchors for destinations that require repeatable real-world placement.
+- Add depth/occlusion where supported so the doorway blends with real geometry.
+- Keep 360 or optimized Gaussian splat content as the first inside-portal renderer, then stream heavier assets only after stable tracking is detected.
+- Log anonymized tracking-state transitions to analytics so thresholds can be tuned from device-field data.
+
 ## Usage
 
 1. Install dependencies: `npm install`
