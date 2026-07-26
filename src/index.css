@@ -486,3 +486,121 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+.agent-panel__dissolve {
+  flex: none;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #211102;
+  font-size: 0.76rem;
+  background: linear-gradient(135deg, #7ce0ff, #f7fbff);
+}
+
+.agent-panel__dissolve[aria-pressed="true"] {
+  background: linear-gradient(135deg, #ffd67e, #ff8f2e);
+}
+
+.portal-editor {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(124, 224, 255, 0.24);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.portal-editor summary {
+  cursor: pointer;
+  color: #7ce0ff;
+  font-weight: 900;
+}
+
+.portal-editor label,
+.portal-editor p {
+  color: #dce7ff;
+  font-size: 0.78rem;
+}
+
+.portal-editor__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.portal-editor select,
+.portal-editor input {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 7px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.portal-editor__url {
+  display: block;
+  margin-top: 8px;
+}
+
+.agent-panel--minimized .portal-editor {
+  display: none;
+}
+
+.portal-editor-access {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.portal-editor-access[hidden],
+.portal-editor[hidden] {
+  display: none;
+}
+
+.portal-editor-access__toggle,
+.portal-editor-access__form button {
+  padding: 8px 12px;
+  border: 1px solid rgba(124, 224, 255, 0.28);
+  color: #eafdff;
+  font-size: 0.78rem;
+  background: rgba(124, 224, 255, 0.12);
+}
+
+.portal-editor-access__form {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.portal-editor-access__form label,
+.portal-editor-access__error {
+  color: #dce7ff;
+  font-size: 0.78rem;
+}
+
+.portal-editor-access__pin {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 7px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.portal-editor-access__error {
+  min-height: 1em;
+  margin: 0;
+  color: #ffb5b5;
+}
+
+.agent-panel--minimized .portal-editor-access {
+  display: none;
+}
+
+.portal-editor-access__form[hidden] {
+  display: none;
+}

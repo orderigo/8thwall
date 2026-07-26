@@ -5,6 +5,41 @@ import * as THREE from 'three'
 
 window.THREE = THREE
 
+const PORTAL_EDITOR_PIN = import.meta.env.VITE_PORTAL_EDITOR_PIN || 'portal-admin'
+const PORTAL_EDITOR_UNLOCK_KEY = 'portal-editor-unlocked'
+
+const EDITOR_TARGETS = {
+  greenScreen: 'Green Screen Plane',
+  gaussianSplat: 'Gaussian Splat World',
+  glb: 'GLB Asset',
+}
+
+const editorDefaults = {
+  greenScreen: {position: [0, 1.18, -1.35], rotation: [0, 0, 0], scale: [1.55, 1.55, 1]},
+  gaussianSplat: {position: [0, 0, -1.2], rotation: [0, 180, 0], scale: [0.58, 0.58, 0.58]},
+  glb: {position: [0.72, 0, -1.6], rotation: [0, 0, 0], scale: [1, 1, 1]},
+}
+
+const editorState = {
+  target: 'greenScreen',
+  transforms: JSON.parse(JSON.stringify(editorDefaults)),
+}
+
+const emitEditorUpdate = (extra = {}) => {
+  const transform = editorState.transforms[editorState.target]
+  window.dispatchEvent(new CustomEvent('portal-editor-update', {
+    detail: {
+      target: editorState.target,
+      transform: {
+        position: transform.position,
+        rotation: transform.rotation.map(THREE.MathUtils.degToRad),
+        scale: transform.scale,
+      },
+      ...extra,
+    },
+  }))
+}
+
 const destinationResponses = {
   'Bagan, Myanmar': 'Bagan portal is ready. Ask about temple history, sunrise routes, or responsible travel etiquette.',
   'Kyoto, Japan': 'Kyoto portal is ready. Ask about shrines, seasonal walking paths, tea culture, or local manners.',
@@ -85,10 +120,33 @@ const buildAgentOverlay = () => {
     <div class="agent-panel__tracking">
       <p>8th Wall SLAM: <strong>Stable</strong> <span>— ready to enter</span></p>
       <button class="agent-panel__recenter" type="button">Recenter portal</button>
+      <button class="agent-panel__dissolve" type="button" aria-pressed="false">Dissolve real world</button>
     </div>
     <div class="agent-panel__log" aria-live="polite">
       <p><strong>Agent:</strong> Welcome to the Original Portal. Drag to move it, pinch to scale it, tap to rotate destinations, then walk through to enter the Luma 3D environment.</p>
     </div>
+    <section class="portal-editor-access" aria-label="Portal editor access">
+      <button class="portal-editor-access__toggle" type="button" aria-expanded="false">Editor access</button>
+      <form class="portal-editor-access__form" hidden>
+        <label>Admin PIN <input class="portal-editor-access__pin" type="password" autocomplete="off" inputmode="text" placeholder="Enter editor PIN" /></label>
+        <button type="submit">Unlock editor</button>
+        <p class="portal-editor-access__error" role="status"></p>
+      </form>
+    </section>
+    <details class="portal-editor" hidden>
+      <summary>three.js Portal World Editor</summary>
+      <label>Asset <select class="portal-editor__target">
+        ${Object.entries(EDITOR_TARGETS).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}
+      </select></label>
+      <label class="portal-editor__url">GLB URL <input class="portal-editor__glb-url" placeholder="/models/world.glb or https://..." /></label>
+      <div class="portal-editor__grid" aria-label="Transform controls">
+        ${['position', 'rotation', 'scale'].map((kind) => ['x', 'y', 'z'].map((axis, index) => `
+          <label>${kind[0].toUpperCase()}${axis.toUpperCase()}
+            <input type="number" step="0.01" data-kind="${kind}" data-axis="${index}" value="${editorState.transforms.greenScreen[kind][index]}">
+          </label>`).join('')).join('')}
+      </div>
+      <p>Position, rotation, and scale are applied live so green-screen planes, Gaussian splats, and GLB files can be placed precisely.</p>
+    </details>
     <form class="agent-panel__form">
       <input aria-label="Ask the portal guide" placeholder="e.g. What should I notice here?" />
       <button type="submit">Ask</button>
@@ -101,8 +159,15 @@ const buildAgentOverlay = () => {
   const log = panel.querySelector('.agent-panel__log')
   const tracking = panel.querySelector('.agent-panel__tracking')
   const recenterButton = panel.querySelector('.agent-panel__recenter')
+  const dissolveButton = panel.querySelector('.agent-panel__dissolve')
+  const editorAccess = panel.querySelector('.portal-editor-access')
+  const editorAccessToggle = panel.querySelector('.portal-editor-access__toggle')
+  const editorAccessForm = panel.querySelector('.portal-editor-access__form')
+  const editorAccessPin = panel.querySelector('.portal-editor-access__pin')
+  const editorAccessError = panel.querySelector('.portal-editor-access__error')
+  const editor = panel.querySelector('.portal-editor')
   const form = panel.querySelector('.agent-panel__form')
-  const input = panel.querySelector('input')
+  const input = form.querySelector('input')
 
   minimizeButton.addEventListener('click', () => {
     const isMinimized = panel.classList.toggle('agent-panel--minimized')
@@ -111,8 +176,74 @@ const buildAgentOverlay = () => {
     minimizeButton.setAttribute('aria-label', isMinimized ? 'Open agent chat' : 'Minimize agent chat')
   })
 
+  const unlockPortalEditor = () => {
+    editor.hidden = false
+    editor.open = true
+    editorAccess.hidden = true
+    window.localStorage.setItem(PORTAL_EDITOR_UNLOCK_KEY, 'true')
+  }
+
+  if (window.localStorage.getItem(PORTAL_EDITOR_UNLOCK_KEY) === 'true') {
+    unlockPortalEditor()
+  }
+
+  editorAccessToggle.addEventListener('click', () => {
+    const shouldOpen = editorAccessForm.hidden
+    editorAccessForm.hidden = !shouldOpen
+    editorAccessToggle.setAttribute('aria-expanded', String(shouldOpen))
+    if (shouldOpen) editorAccessPin.focus()
+  })
+
+  editorAccessForm.addEventListener('submit', (event) => {
+    event.preventDefault()
+    if (editorAccessPin.value.trim() === PORTAL_EDITOR_PIN) {
+      editorAccessPin.value = ''
+      editorAccessError.textContent = ''
+      unlockPortalEditor()
+      return
+    }
+
+    editorAccessError.textContent = 'Editor locked. Ask an administrator for access.'
+    editorAccessPin.select()
+  })
+
   recenterButton.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('portal-recenter-request'))
+  })
+
+  dissolveButton.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('portal-dissolve-toggle'))
+  })
+
+  window.addEventListener('portal-dissolve-change', (event) => {
+    dissolveButton.setAttribute('aria-pressed', String(event.detail.enabled))
+    dissolveButton.textContent = event.detail.enabled ? 'Restore portal world' : 'Dissolve real world'
+  })
+
+  const editorControls = [...editor.querySelectorAll('[data-kind]')]
+
+  const syncEditorControls = () => {
+    const transform = editorState.transforms[editorState.target]
+    editorControls.forEach((control) => {
+      control.value = transform[control.dataset.kind][Number(control.dataset.axis)]
+    })
+  }
+
+  editor.querySelector('.portal-editor__target').addEventListener('change', (event) => {
+    editorState.target = event.target.value
+    syncEditorControls()
+    emitEditorUpdate()
+  })
+
+  editor.querySelector('.portal-editor__glb-url').addEventListener('change', (event) => {
+    emitEditorUpdate({url: event.target.value.trim()})
+  })
+
+  editorControls.forEach((control) => {
+    control.addEventListener('input', () => {
+      editorState.transforms[editorState.target][control.dataset.kind][Number(control.dataset.axis)] = Number(control.value)
+      emitEditorUpdate()
+    })
   })
 
   window.addEventListener('portal-destination-change', (event) => {
@@ -135,7 +266,7 @@ const buildAgentOverlay = () => {
   })
 
   window.addEventListener('portal-entry-change', (event) => {
-    const status = event.detail.isInsidePortal ? 'Inside Luma 3D environment' : 'Original Portal threshold'
+    const status = event.detail.isInsidePortal ? 'Inside editable portal world' : 'Original Portal threshold'
     panel.dataset.portalState = event.detail.isInsidePortal ? 'inside' : 'outside'
     panel.querySelector('h1').textContent = status
   })
