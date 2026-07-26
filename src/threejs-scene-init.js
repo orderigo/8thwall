@@ -2,6 +2,7 @@
 // travel portal into the SLAM-tracked world and keeps it animated with three.js.
 import * as THREE from 'three'
 import {LumaSplatsThree} from '@lumaai/luma-web'
+import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js'
 import {AgentVideo} from './agentvideo'
 
 const DESTINATIONS = [
@@ -63,7 +64,16 @@ const makeTextTexture = (title, lines, accentColor = '#ffb04f') => {
   return texture
 }
 
-const LUMA_SPLAT_SOURCE = 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2'
+const DEFAULT_WORLD_CONFIG = {
+  greenScreen: {position: [0, 1.18, -1.35], rotation: [0, 0, 0], scale: [1.55, 1.55, 1]},
+  gaussianSplat: {
+    source: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2',
+    position: [0, 0, -1.2],
+    rotation: [0, Math.PI, 0],
+    scale: [0.58, 0.58, 0.58],
+  },
+  glb: {url: '', position: [0.72, 0, -1.6], rotation: [0, 0, 0], scale: [1, 1, 1]},
+}
 const DEFAULT_PORTAL_SCALE = 2
 const MIN_PORTAL_SCALE = 0.35
 const PORTAL_ENTRY_RADIUS = 0.82
@@ -71,7 +81,27 @@ const PORTAL_EXIT_RADIUS = 1.04
 const PORTAL_ENTRY_DEPTH = 0.12
 const PORTAL_DRAG_SENSITIVITY = 0.0038
 const MAX_TAP_MOVEMENT = 10
-const LUMA_SPLAT_SCALE = 0.58
+const WORLD_DISSOLVE_SPEED = 0.08
+
+const applyTransform = (object, transform = {}) => {
+  if (!object) return
+  const {position, rotation, scale} = transform
+  if (position) object.position.fromArray(position)
+  if (rotation) object.rotation.set(rotation[0], rotation[1], rotation[2])
+  if (scale) object.scale.fromArray(scale)
+}
+
+const setObjectOpacity = (object, opacity) => {
+  object.traverse((child) => {
+    if (!child.material) return
+    const materials = Array.isArray(child.material) ? child.material : [child.material]
+    materials.forEach((material) => {
+      material.transparent = true
+      material.opacity = opacity
+      material.needsUpdate = true
+    })
+  })
+}
 
 const createPortal = () => {
   const group = new THREE.Group()
@@ -166,6 +196,13 @@ export const initScenePipelineModule = () => {
   let isInsidePortal = false
   let lumaSplats
   let agentVideo
+  let portalWorld
+  let greenScreenPlane
+  let glbScene
+  let gltfLoader
+  let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
+  let dissolveRealWorld = false
+  let worldOpacity = 1
   let smoothedCameraPosition = new THREE.Vector3()
   let hasSmoothedCameraPosition = false
   const cameraPortalPosition = new THREE.Vector3()
@@ -192,9 +229,9 @@ export const initScenePipelineModule = () => {
     portal.quaternion.copy(camera.quaternion)
     portal.rotation.x = 0
     portal.rotation.z = 0
-    if (lumaSplats) {
-      lumaSplats.position.copy(portal.position)
-      lumaSplats.rotation.y = portal.rotation.y + Math.PI
+    if (portalWorld) {
+      portalWorld.position.copy(portal.position)
+      portalWorld.quaternion.copy(portal.quaternion)
     }
     dispatchTrackingStatus()
   }
@@ -238,23 +275,38 @@ export const initScenePipelineModule = () => {
     directionalLight.castShadow = true
     scene.add(directionalLight)
 
+    portalWorld = new THREE.Group()
+    portalWorld.name = 'editable-portal-world'
+    portalWorld.visible = false
+    scene.add(portalWorld)
+
+    const greenMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ff66,
+      transparent: true,
+      opacity: 0.68,
+      side: THREE.DoubleSide,
+    })
+    greenScreenPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), greenMaterial)
+    greenScreenPlane.name = 'editable-green-screen-plane'
+    applyTransform(greenScreenPlane, worldConfig.greenScreen)
+    portalWorld.add(greenScreenPlane)
+
     lumaSplats = new LumaSplatsThree({
-      source: LUMA_SPLAT_SOURCE,
+      source: worldConfig.gaussianSplat.source,
       loadingAnimationEnabled: false,
       enableThreeShaderIntegration: false,
     })
-    lumaSplats.name = 'luma-gaussian-splat-destination'
-    lumaSplats.position.set(0, 1.35, -3.2)
-    lumaSplats.rotation.y = Math.PI
-    lumaSplats.scale.setScalar(LUMA_SPLAT_SCALE)
-    lumaSplats.visible = false
-    scene.add(lumaSplats)
+    lumaSplats.name = 'editable-gaussian-splat-world'
+    applyTransform(lumaSplats, worldConfig.gaussianSplat)
+    portalWorld.add(lumaSplats)
 
     lumaSplats.onLoad = () => {
       lumaSplats.captureCubemap(renderer).then((capturedTexture) => {
         scene.environment = capturedTexture
       })
     }
+
+    gltfLoader = new GLTFLoader()
 
     portal = createPortal()
     scene.add(portal)
@@ -322,7 +374,7 @@ export const initScenePipelineModule = () => {
           portal.position.addScaledVector(dragRight, deltaX * PORTAL_DRAG_SENSITIVITY)
           portal.position.addScaledVector(dragUp, -deltaY * PORTAL_DRAG_SENSITIVITY)
           portal.position.y = Math.max(0.35, portal.position.y)
-          lumaSplats.position.copy(portal.position)
+          if (portalWorld) portalWorld.position.copy(portal.position)
         }
       }, {passive: false})
 
@@ -345,6 +397,30 @@ export const initScenePipelineModule = () => {
       )
 
       window.addEventListener('portal-recenter-request', placePortalInFrontOfCamera)
+      window.addEventListener('portal-dissolve-toggle', () => {
+        dissolveRealWorld = !dissolveRealWorld
+        window.dispatchEvent(new CustomEvent('portal-dissolve-change', {detail: {enabled: dissolveRealWorld}}))
+      })
+      window.addEventListener('portal-editor-update', (event) => {
+        const {target, transform, url} = event.detail
+        if (!worldConfig[target]) return
+        if (transform) worldConfig[target] = {...worldConfig[target], ...transform}
+        if (target === 'greenScreen') applyTransform(greenScreenPlane, worldConfig.greenScreen)
+        if (target === 'gaussianSplat') applyTransform(lumaSplats, worldConfig.gaussianSplat)
+        if (target === 'glb') {
+          if (url !== undefined) worldConfig.glb.url = url
+          if (glbScene) applyTransform(glbScene, worldConfig.glb)
+          if (worldConfig.glb.url && (!glbScene || url !== undefined)) {
+            if (glbScene) portalWorld.remove(glbScene)
+            gltfLoader.load(worldConfig.glb.url, (gltf) => {
+              glbScene = gltf.scene
+              glbScene.name = 'editable-glb-world-asset'
+              applyTransform(glbScene, worldConfig.glb)
+              portalWorld.add(glbScene)
+            })
+          }
+        }
+      })
       dispatchTrackingStatus()
 
       canvas.addEventListener('touchend', (event) => {
@@ -385,16 +461,30 @@ export const initScenePipelineModule = () => {
         isInsidePortal = shouldBeInsidePortal
         window.dispatchEvent(new CustomEvent('portal-entry-change', {detail: {isInsidePortal}}))
         if (agentVideo) agentVideo.setActive(isInsidePortal)
-        if (isInsidePortal) playPortalEntrySound()
+        if (isInsidePortal) {
+          portal.visible = false
+          if (portalWorld) {
+            portalWorld.position.copy(portal.position)
+            portalWorld.quaternion.copy(portal.quaternion)
+          }
+          playPortalEntrySound()
+        } else {
+          portal.visible = true
+        }
       }
 
-      if (lumaSplats) {
-        lumaSplats.visible = isInsidePortal
-        lumaSplats.position.copy(portal.position)
+      if (portalWorld) {
+        portalWorld.visible = isInsidePortal
+        if (isInsidePortal) {
+          portalWorld.position.copy(portal.position)
+          portalWorld.quaternion.copy(portal.quaternion)
+        }
       }
-      portal.scale.setScalar(portal.userData.baseScale)
-      portal.userData.outerRing.material.opacity = 0.9
-      portal.userData.innerMaterial.opacity = 0.94
+      worldOpacity += ((dissolveRealWorld ? 0.34 : 1) - worldOpacity) * WORLD_DISSOLVE_SPEED
+      if (portalWorld) setObjectOpacity(portalWorld, worldOpacity)
+      portal.scale.setScalar(portal.userData.baseScale * (isInsidePortal ? 0.001 : 1))
+      portal.userData.outerRing.material.opacity = isInsidePortal ? 0 : 0.9
+      portal.userData.innerMaterial.opacity = isInsidePortal ? 0 : 0.94
       portal.userData.outerRing.rotation.z = elapsed * 0.85
       portal.userData.runeGroup.rotation.z = -elapsed * 0.55
       portal.userData.sparks.rotation.z = elapsed * 0.32
