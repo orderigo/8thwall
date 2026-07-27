@@ -89,6 +89,70 @@ Production hardening checklist:
 3. To connect to a mobile device, follow [8th Wall's testing instructions](https://8th.io/test-on-mobile).
 4. Open the experience on a supported mobile browser and allow camera access.
 
+
+## Supabase ချိတ်ဆက်နည်း
+
+ဒီ prototype မှာ Supabase ကို frontend ကနေ `VITE_SUPABASE_URL` နဲ့ `VITE_SUPABASE_ANON_KEY` သုံးပြီး ချိတ်ထားပါတယ်။ Login/Signup, admin user list, နဲ့ Portal World Editor save/load တွေက `src/app.js` ထဲက Supabase REST helpers တွေနဲ့ အလုပ်လုပ်ပါတယ်။
+
+### 1. Supabase project တစ်ခုဖန်တီးပါ
+
+1. [Supabase](https://supabase.com/) မှာ project အသစ်တစ်ခုဖန်တီးပါ။
+2. Dashboard ထဲက **Authentication > Providers > Email** မှာ Email provider ကို enable လုပ်ပါ။
+3. **Project Settings > API** ထဲက Project URL နဲ့ anon public key ကို copy လုပ်ပါ။
+
+### 2. Environment variables ထည့်ပါ
+
+`.env.example` ကို `.env.local` အဖြစ် copy လုပ်ပြီး project URL / anon key ထည့်ပါ။
+
+```bash
+cp .env.example .env.local
+```
+
+`.env.local` ထဲမှာ ဒီလိုထားပါ။
+
+```env
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-public-anon-key
+VITE_PORTAL_EDITOR_PIN=portal-admin
+```
+
+`VITE_PORTAL_EDITOR_PIN` က frontend admin/editor panel unlock PIN ဖြစ်ပါတယ်။ Production မှာ secret မထားသင့်ပါဘူး၊ real admin actions တွေအတွက် Supabase Edge Function သို့မဟုတ် server backend တစ်ခုနဲ့ကာကွယ်သင့်ပါတယ်။
+
+### 3. Supabase tables/RLS policy ထည့်ပါ
+
+Supabase Dashboard > **SQL Editor** ထဲမှာ `docs/supabase-setup.sql` ထဲက SQL ကို run ပါ။ အဲ့ဒီ SQL က:
+
+- `profiles` table ဖန်တီးပြီး signup user တွေအတွက် profile auto-create လုပ်ပေးပါတယ်။
+- `portal_worlds` table ဖန်တီးပြီး Portal World Editor transform config ကို သိမ်းပေးပါတယ်။
+- Row Level Security policies တွေထည့်ပြီး logged-in user / editor / admin role အလိုက် read/write ခွင့်သတ်မှတ်ပေးပါတယ်။
+
+### 4. ပထမဆုံး admin user သတ်မှတ်ပါ
+
+App ကနေ Signup လုပ်ပြီးနောက် SQL Editor မှာ ကိုယ့် email ကို admin role ပြောင်းပါ။
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = 'you@example.com';
+```
+
+Portal World Editor ကို save/load လုပ်ချင်တဲ့ user တွေကို `editor` role ပေးနိုင်ပါတယ်။
+
+```sql
+update public.profiles
+set role = 'editor'
+where email = 'editor@example.com';
+```
+
+### 5. App ကို run ပါ
+
+```bash
+npm install
+npm run serve
+```
+
+Home page မှာ Login/Signup လုပ်ပါ။ Admin panel ကိုဖွင့်ပြီး PIN ထည့်ပါ။ Portal view ထဲမှာ Editor access ကို unlock လုပ်ပြီး **Save backend world** / **Load backend world** ကိုနှိပ်ရင် Supabase `portal_worlds` table နဲ့ ချိတ်ပြီး frontend portal world ကို update လုပ်ပါလိမ့်မယ်။
+
 ## Deployment
 
 Create a production build with `npm run build`, which outputs the app to the `dist` folder. Publish the generated files to your preferred static host.
