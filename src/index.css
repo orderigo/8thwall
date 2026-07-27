@@ -604,3 +604,215 @@ body {
 .portal-editor-access__form[hidden] {
   display: none;
 }
+
+.home-page--redesigned {
+  align-content: start;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 10% 18%, rgba(0, 255, 178, 0.2), transparent 28%),
+    radial-gradient(circle at 88% 8%, rgba(124, 224, 255, 0.22), transparent 30%),
+    linear-gradient(135deg, #020617 0%, #11183b 46%, #33133f 100%);
+}
+
+.home-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.home-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(14px);
+}
+
+.hero-card__button--ghost,
+.admin-card button,
+.auth-form button,
+.auth-card__tabs button,
+.admin-panel button,
+.vr-controls button,
+.portal-editor__actions button {
+  cursor: pointer;
+}
+
+.hero-card__button--ghost {
+  border: 1px solid rgba(124, 224, 255, 0.35);
+  color: #eafdff;
+  background: rgba(124, 224, 255, 0.12);
+}
+
+.home-dashboard {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.home-dashboard article {
+  min-height: 172px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.075);
+  backdrop-filter: blur(14px);
+}
+
+.auth-card,
+.admin-card {
+  grid-column: span 2;
+}
+
+.auth-card__tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.auth-card__tabs button,
+.admin-card button,
+.auth-form button,
+.portal-editor__actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: #211102;
+  font-weight: 900;
+  background: linear-gradient(135deg, #ffd67e, #ff8f2e);
+}
+
+.auth-card__tabs button:not(.is-active) {
+  color: #eafdff;
+  background: rgba(124, 224, 255, 0.12);
+}
+
+.auth-form {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-form label,
+.admin-panel label {
+  color: #dce7ff;
+  font-size: 0.84rem;
+}
+
+.auth-form input,
+.admin-panel input {
+  width: 100%;
+  margin-top: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  padding: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.36);
+}
+
+.auth-form__status,
+.admin-panel__note {
+  margin: 0;
+  color: #b8c9e8;
+  font-size: 0.82rem;
+}
+
+.admin-panel[hidden],
+.vr-controls[hidden] {
+  display: none;
+}
+
+.admin-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(1, 5, 17, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.admin-panel__dialog {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: min(760px, 90vh);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid rgba(124, 224, 255, 0.28);
+  border-radius: 28px;
+  color: #f8fbff;
+  background: linear-gradient(145deg, rgba(8, 14, 31, 0.96), rgba(34, 28, 78, 0.94));
+}
+
+.admin-panel__close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+.admin-panel__toolbar,
+.portal-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.admin-panel table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.admin-panel th,
+.admin-panel td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: left;
+}
+
+.vr-controls {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 20;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.vr-controls div {
+  display: flex;
+  gap: 8px;
+}
+
+.vr-controls button {
+  min-width: 54px;
+  min-height: 48px;
+  border: 1px solid rgba(124, 224, 255, 0.4);
+  border-radius: 16px;
+  color: #eafdff;
+  font-weight: 950;
+  background: rgba(4, 11, 28, 0.76);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+@media (max-width: 960px) {
+  .home-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card,
+  .admin-card {
+    grid-column: auto;
+  }
+}

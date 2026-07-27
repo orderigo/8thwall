@@ -65,7 +65,7 @@ const makeTextTexture = (title, lines, accentColor = '#ffb04f') => {
 }
 
 const DEFAULT_WORLD_CONFIG = {
-  greenScreen: {position: [0, 1.18, -1.35], rotation: [0, 0, 0], scale: [1.55, 1.55, 1]},
+  greenScreen: {position: [0, 1.18, -1.35], rotation: [0, Math.PI / 2, 0], scale: [1, 1, 1]},
   gaussianSplat: {
     source: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2',
     position: [0, 0, -1.2],
@@ -202,6 +202,9 @@ export const initScenePipelineModule = () => {
   let gltfLoader
   let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
   let dissolveRealWorld = false
+  let vrTourMode = false
+  let vrMoveDirection = null
+  const vrTourOffset = new THREE.Vector3()
   let worldOpacity = 1
   let smoothedCameraPosition = new THREE.Vector3()
   let hasSmoothedCameraPosition = false
@@ -401,6 +404,17 @@ export const initScenePipelineModule = () => {
         dissolveRealWorld = !dissolveRealWorld
         window.dispatchEvent(new CustomEvent('portal-dissolve-change', {detail: {enabled: dissolveRealWorld}}))
       })
+      window.addEventListener('portal-vr-toggle', (event) => {
+        vrTourMode = event.detail?.enabled ?? !vrTourMode
+        isInsidePortal = vrTourMode || isInsidePortal
+        if (portalWorld) portalWorld.visible = isInsidePortal
+        if (portal) portal.visible = !isInsidePortal
+        window.dispatchEvent(new CustomEvent('portal-vr-change', {detail: {enabled: vrTourMode}}))
+        window.dispatchEvent(new CustomEvent('portal-entry-change', {detail: {isInsidePortal}}))
+      })
+      window.addEventListener('portal-vr-move', (event) => {
+        vrMoveDirection = event.detail.direction
+      })
       window.addEventListener('portal-editor-update', (event) => {
         const {target, transform, url} = event.detail
         if (!worldConfig[target]) return
@@ -455,7 +469,7 @@ export const initScenePipelineModule = () => {
       const isBehindPortal = isInsidePortal
         ? portalPlaneDistance < PORTAL_ENTRY_DEPTH
         : portalPlaneDistance < -PORTAL_ENTRY_DEPTH
-      const shouldBeInsidePortal = isWithinPortalOpening && isBehindPortal
+      const shouldBeInsidePortal = vrTourMode || (isWithinPortalOpening && isBehindPortal)
 
       if (shouldBeInsidePortal !== isInsidePortal) {
         isInsidePortal = shouldBeInsidePortal
@@ -476,9 +490,16 @@ export const initScenePipelineModule = () => {
       if (portalWorld) {
         portalWorld.visible = isInsidePortal
         if (isInsidePortal) {
-          portalWorld.position.copy(portal.position)
+          portalWorld.position.copy(portal.position).add(vrTourOffset)
           portalWorld.quaternion.copy(portal.quaternion)
         }
+      }
+      if (vrTourMode && vrMoveDirection) {
+        const speed = 0.035
+        if (vrMoveDirection === 'forward') vrTourOffset.z += speed
+        if (vrMoveDirection === 'back') vrTourOffset.z -= speed
+        if (vrMoveDirection === 'left') vrTourOffset.x += speed
+        if (vrMoveDirection === 'right') vrTourOffset.x -= speed
       }
       worldOpacity += ((dissolveRealWorld ? 0.34 : 1) - worldOpacity) * WORLD_DISSOLVE_SPEED
       if (portalWorld) setObjectOpacity(portalWorld, worldOpacity)
