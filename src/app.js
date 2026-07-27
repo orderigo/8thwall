@@ -128,70 +128,51 @@ const destinationResponses = {
   'Machu Picchu, Peru': 'Machu Picchu portal is ready. Ask about Inca engineering, altitude prep, or trail planning.',
 }
 
-const buildHomePage = ({onExplore}) => {
-  const session = loadSession()
+const buildHomePage = ({onExplore, onVrWorld}) => {
   const home = document.createElement('main')
   home.className = 'home-page home-page--redesigned'
   home.innerHTML = `
     <div class="home-shell">
-      <nav class="home-nav">
-        <strong>PortalOS</strong>
-        <span>${session ? `Signed in as ${session.user?.email || 'Portal user'}` : 'Supabase-ready access'}</span>
+      <nav class="home-nav" aria-label="Main navigation">
+        <a class="home-nav__brand" href="#top" aria-label="Portal World home">Portal World</a>
+        <div class="home-nav__links">
+          <a href="#destinations">Destinations</a>
+          <button type="button" data-action="explore">AR Portal</button>
+          <button type="button" data-action="vr">VR World</button>
+          <button type="button" data-action="admin-login">Admin Login</button>
+        </div>
       </nav>
-      <section class="hero-card" aria-labelledby="hero-title">
+      <section class="hero-card" id="top" aria-labelledby="hero-title">
         <div class="hero-card__content">
-          <p class="hero-card__eyebrow">AR Portal • VR Tour • Admin Studio</p>
-          <h1 id="hero-title">Build, manage, and explore living portal worlds.</h1>
-          <p class="hero-card__copy">A redesigned control hub with Supabase login, signup, user operations, a backend portal editor, and a mobile-friendly virtual tour mode linked to the frontend world.</p>
+          <p class="hero-card__eyebrow">Immersive travel preview</p>
+          <h1 id="hero-title">Step into curated portal worlds from your browser.</h1>
+          <p class="hero-card__copy">Choose an interactive AR portal for camera-based exploration, or open the standalone VR world when you want a full-screen virtual destination without 8th Wall tracking.</p>
           <div class="hero-card__actions">
-            <button class="hero-card__button" type="button" data-action="explore">Launch Portal</button>
-            <button class="hero-card__button hero-card__button--ghost" type="button" data-action="vr">Start VR Tour</button>
+            <button class="hero-card__button" type="button" data-action="explore">Launch AR Portal</button>
+            <button class="hero-card__button hero-card__button--ghost" type="button" data-action="vr">Enter VR World</button>
           </div>
         </div>
-        <div class="portal-preview" aria-hidden="true"><div class="portal-preview__ring"></div><div class="portal-preview__core"><span>Portal<br>World</span></div><div class="portal-preview__orbit portal-preview__orbit--one"></div><div class="portal-preview__orbit portal-preview__orbit--two"></div></div>
+        <div class="portal-preview" aria-hidden="true"><div class="portal-preview__ring"></div><div class="portal-preview__core"><span>VR<br>World</span></div><div class="portal-preview__orbit portal-preview__orbit--one"></div><div class="portal-preview__orbit portal-preview__orbit--two"></div></div>
       </section>
-      <section class="home-dashboard" aria-label="Portal dashboard">
-        <article class="auth-card">
-          <div class="auth-card__tabs"><button type="button" class="is-active" data-auth-mode="login">Login</button><button type="button" data-auth-mode="signup">Signup</button></div>
-          <form class="auth-form"><label>Email<input type="email" name="email" autocomplete="email" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required minlength="6"></label><button type="submit">Continue with Supabase</button><p class="auth-form__status" role="status"></p></form>
-        </article>
-        <article class="admin-card"><h2>Admin user management</h2><p>Unlock admin tools with the editor PIN, then load users from a Supabase <code>profiles</code> table or manage demo users locally.</p><button type="button" data-action="admin">Open Admin Panel</button></article>
-        <article><span>01</span><h2>Backend Portal Editor</h2><p>Save world transforms to Supabase and broadcast them live to the frontend portal scene.</p></article>
-        <article><span>02</span><h2>VR Virtual Tour</h2><p>Explore the portal world without walking by using mobile forward/back/left/right controls.</p></article>
-        <article><span>03</span><h2>Greenscreen Aligned</h2><p>The greenscreen plane is upright at 90° and scaled to roughly half of the portal door.</p></article>
+      <section class="destination-strip" id="destinations" aria-label="Available destinations">
+        <article><strong>Bagan</strong><span>Temple horizons and sunrise storytelling.</span></article>
+        <article><strong>Kyoto</strong><span>Seasonal paths, shrines, and tea culture.</span></article>
+        <article><strong>Machu Picchu</strong><span>Inca engineering and mountain views.</span></article>
       </section>
     </div>
   `
 
-  const launch = (vr = false) => {
+  const launchAr = () => {
     home.classList.add('home-page--exiting')
     window.setTimeout(() => {
       home.remove()
-      onExplore({vr})
+      onExplore()
     }, 420)
   }
-  home.querySelector('[data-action="explore"]').addEventListener('click', () => launch(false))
-  home.querySelector('[data-action="vr"]').addEventListener('click', () => launch(true))
-  home.querySelector('[data-action="admin"]').addEventListener('click', () => document.body.dispatchEvent(new CustomEvent('portal-open-admin')))
 
-  let authMode = 'login'
-  home.querySelectorAll('[data-auth-mode]').forEach((button) => button.addEventListener('click', () => {
-    authMode = button.dataset.authMode
-    home.querySelectorAll('[data-auth-mode]').forEach((item) => item.classList.toggle('is-active', item === button))
-  }))
-  home.querySelector('.auth-form').addEventListener('submit', async (event) => {
-    event.preventDefault()
-    const status = home.querySelector('.auth-form__status')
-    const form = new FormData(event.currentTarget)
-    status.textContent = 'Connecting to Supabase...'
-    try {
-      const data = await authRequest(authMode === 'login' ? 'token?grant_type=password' : 'signup', {email: form.get('email'), password: form.get('password')})
-      saveSession(data)
-      status.textContent = authMode === 'signup' ? 'Signup complete. Check email confirmation if enabled.' : 'Login successful.'
-    } catch (error) {
-      status.textContent = error.message
-    }
-  })
+  home.querySelectorAll('[data-action="explore"]').forEach((button) => button.addEventListener('click', launchAr))
+  home.querySelectorAll('[data-action="vr"]').forEach((button) => button.addEventListener('click', onVrWorld))
+  home.querySelector('[data-action="admin-login"]').addEventListener('click', () => document.body.dispatchEvent(new CustomEvent('portal-open-admin-login')))
   document.body.prepend(home)
 }
 
@@ -203,30 +184,54 @@ const buildAdminPanel = () => {
   panel.innerHTML = `
     <div class="admin-panel__dialog" role="dialog" aria-modal="true" aria-labelledby="admin-title">
       <button class="admin-panel__close" type="button" aria-label="Close admin panel">×</button>
-      <p class="hero-card__eyebrow">Backend Portal Admin</p>
-      <h2 id="admin-title">User management</h2>
-      <form class="admin-panel__unlock"><label>Admin PIN<input type="password" name="pin" placeholder="portal-admin" autocomplete="off"></label><button type="submit">Unlock</button></form>
+      <p class="hero-card__eyebrow">Admin Dashboard</p>
+      <h2 id="admin-title">Portal operations</h2>
+      <form class="admin-login-form">
+        <label>Email<input type="email" name="email" autocomplete="email" required></label>
+        <label>Password<input type="password" name="password" autocomplete="current-password" required minlength="6"></label>
+        <button type="submit">Login to dashboard</button>
+        <p class="auth-form__status" role="status"></p>
+      </form>
       <div class="admin-panel__content" hidden>
         <div class="admin-panel__toolbar"><button type="button" data-admin="load">Load users</button><button type="button" data-admin="demo">Add demo user</button><button type="button" data-admin="logout">Logout</button></div>
         <div class="admin-panel__users" role="status"></div>
-        <p class="admin-panel__note">For production, expose a secure Edge Function for privileged auth.users operations. This UI reads public <code>profiles</code> rows with RLS and updates portal world data with the active Supabase token.</p>
+        <p class="admin-panel__note">Dashboard access requires an authenticated admin session. For production user operations, expose secure server-side endpoints or Supabase Edge Functions with role checks.</p>
       </div>
     </div>`
   document.body.appendChild(panel)
+  const loginForm = panel.querySelector('.admin-login-form')
+  const status = panel.querySelector('.auth-form__status')
   const content = panel.querySelector('.admin-panel__content')
   const users = panel.querySelector('.admin-panel__users')
-  const open = () => { panel.hidden = false }
+  const showDashboard = () => {
+    loginForm.hidden = true
+    content.hidden = false
+    users.innerHTML = `<p>Signed in as ${loadSession()?.user?.email || 'admin'}.</p>`
+  }
+  const open = () => {
+    panel.hidden = false
+    if (getAccessToken()) showDashboard()
+    else {
+      loginForm.hidden = false
+      content.hidden = true
+      status.textContent = ''
+    }
+  }
   const close = () => { panel.hidden = true }
-  document.body.addEventListener('portal-open-admin', open)
-  window.addEventListener('portal-open-admin', open)
+  document.body.addEventListener('portal-open-admin-login', open)
   panel.querySelector('.admin-panel__close').addEventListener('click', close)
-  panel.querySelector('.admin-panel__unlock').addEventListener('submit', (event) => {
+  loginForm.addEventListener('submit', async (event) => {
     event.preventDefault()
-    if (new FormData(event.currentTarget).get('pin') === PORTAL_EDITOR_PIN) {
-      event.currentTarget.hidden = true
-      content.hidden = false
-      users.innerHTML = '<p>Admin unlocked. Load Supabase users or add demo users.</p>'
-    } else users.innerHTML = '<p>Invalid PIN.</p>'
+    const form = new FormData(event.currentTarget)
+    status.textContent = 'Checking admin credentials...'
+    try {
+      const data = await authRequest('token?grant_type=password', {email: form.get('email'), password: form.get('password')})
+      saveSession(data)
+      status.textContent = 'Login successful.'
+      showDashboard()
+    } catch (error) {
+      status.textContent = error.message
+    }
   })
   const renderUsers = (rows) => {
     users.innerHTML = `<table><thead><tr><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>${rows.map((user) => `<tr><td>${user.email || user.id}</td><td>${user.role || 'viewer'}</td><td>${user.status || 'active'}</td></tr>`).join('')}</tbody></table>`
@@ -234,7 +239,13 @@ const buildAdminPanel = () => {
   panel.addEventListener('click', async (event) => {
     const action = event.target.dataset.admin
     if (!action) return
-    if (action === 'logout') { saveSession(null); users.innerHTML = '<p>Logged out.</p>'; return }
+    if (action === 'logout') {
+      saveSession(null)
+      content.hidden = true
+      loginForm.hidden = false
+      status.textContent = 'Logged out.'
+      return
+    }
     if (action === 'demo') {
       const demo = JSON.parse(window.localStorage.getItem('portal-demo-users') || '[]')
       demo.push({email: `demo${demo.length + 1}@portal.local`, role: demo.length ? 'editor' : 'admin', status: 'active'})
@@ -253,6 +264,36 @@ const buildAdminPanel = () => {
     }
   })
 }
+
+const buildStandaloneVrWorld = () => {
+  if (document.querySelector('.standalone-vr')) return
+  const world = document.createElement('section')
+  world.className = 'standalone-vr'
+  world.innerHTML = `
+    <div class="standalone-vr__sky"><span></span><span></span><span></span></div>
+    <div class="standalone-vr__hud"><p>Standalone VR World</p><h2>Bagan sunset portal</h2><span>No 8th Wall tracking required.</span></div>
+    <div class="standalone-vr__controls"><button data-move="up">▲</button><div><button data-move="left">◀</button><button data-move="down">▼</button><button data-move="right">▶</button></div><button data-close-vr>Exit VR World</button></div>
+  `
+  document.body.appendChild(world)
+  let x = 0
+  let y = 0
+  const render = () => {
+    world.style.setProperty('--vr-pan-x', `${x}px`)
+    world.style.setProperty('--vr-pan-y', `${y}px`)
+  }
+  world.addEventListener('click', (event) => {
+    const move = event.target.dataset.move
+    if (event.target.dataset.closeVr !== undefined) { world.remove(); return }
+    if (!move) return
+    if (move === 'left') x -= 36
+    if (move === 'right') x += 36
+    if (move === 'up') y -= 24
+    if (move === 'down') y += 24
+    render()
+  })
+  render()
+}
+
 
 const buildVrControls = () => {
   const controls = document.createElement('section')
@@ -457,7 +498,11 @@ const buildAgentOverlay = () => {
   })
 }
 
-const startOriginalPortal = ({vr = false} = {}) => {
+const startOriginalPortal = () => {
+  if (!window.XR8) {
+    window.alert('AR Portal is still loading. Please try again in a moment.')
+    return
+  }
   buildVrControls()
   buildAgentOverlay()
   document.body.classList.add('original-portal-active')
@@ -475,12 +520,15 @@ const startOriginalPortal = ({vr = false} = {}) => {
 
   const canvas = document.getElementById('camerafeed')
   XR8.run({canvas})
-  if (vr) window.setTimeout(() => window.dispatchEvent(new CustomEvent('portal-vr-toggle', {detail: {enabled: true}})), 900)
 }
 
-const onxrloaded = () => {
+const initializeApp = () => {
   buildAdminPanel()
-  buildHomePage({onExplore: startOriginalPortal})
+  buildHomePage({onExplore: startOriginalPortal, onVrWorld: buildStandaloneVrWorld})
 }
 
-window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeApp, {once: true})
+} else {
+  initializeApp()
+}
