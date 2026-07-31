@@ -14,19 +14,17 @@ const SUPABASE_AUTH_KEY = 'portal-supabase-auth'
 const PORTAL_WORLD_STORAGE_KEY = 'portal-world-config'
 
 const EDITOR_TARGETS = {
-  greenScreen: 'Green Screen Plane',
   gaussianSplat: 'Gaussian Splat World',
   glb: 'GLB Asset',
 }
 
 const editorDefaults = {
-  greenScreen: {position: [0, 1.18, -1.35], rotation: [0, 90, 0], scale: [1, 1, 1]},
   gaussianSplat: {position: [0, 0, -1.2], rotation: [0, 180, 0], scale: [0.58, 0.58, 0.58]},
   glb: {position: [0.72, 0, -1.6], rotation: [0, 0, 0], scale: [1, 1, 1]},
 }
 
 const editorState = {
-  target: 'greenScreen',
+  target: 'gaussianSplat',
   transforms: JSON.parse(JSON.stringify(editorDefaults)),
 }
 
@@ -323,12 +321,17 @@ const buildAgentOverlay = () => {
     </div>
     <p class="agent-panel__destination">Destination: <strong>Bagan, Myanmar</strong></p>
     <div class="agent-panel__tracking">
-      <p>8th Wall SLAM: <strong>Stable</strong> <span>— ready to enter</span></p>
+      <p>8th Wall Ground Tracking: <strong>Stable</strong> <span>— draw the circle first</span></p>
       <button class="agent-panel__recenter" type="button">Recenter portal</button>
       <button class="agent-panel__dissolve" type="button" aria-pressed="false">Dissolve real world</button>
     </div>
+    <div class="gesture-instruction" aria-live="polite">
+      <strong>လက်ညိုးထိပ်နဲ့ စက်ဝိုင်းဆွဲပါ</strong>
+      <span>Point your index finger at the camera and draw one complete circle. If hand tracking does not start, press and drag a circle on the screen as fallback.</span>
+      <meter min="0" max="1" value="0"></meter>
+    </div>
     <div class="agent-panel__log" aria-live="polite">
-      <p><strong>Agent:</strong> Welcome to the Original Portal. Drag to move it, pinch to scale it, tap to rotate destinations, then walk through to enter the Luma 3D environment.</p>
+      <p><strong>Agent:</strong> Welcome to the Original Portal. Hold your hand in front of the camera, trace a full circle with your index fingertip, and the particle trail will summon the ground-tracked portal ring.</p>
     </div>
     <section class="portal-editor-access" aria-label="Portal editor access">
       <button class="portal-editor-access__toggle" type="button" aria-expanded="false">Editor access</button>
@@ -347,10 +350,10 @@ const buildAgentOverlay = () => {
       <div class="portal-editor__grid" aria-label="Transform controls">
         ${['position', 'rotation', 'scale'].map((kind) => ['x', 'y', 'z'].map((axis, index) => `
           <label>${kind[0].toUpperCase()}${axis.toUpperCase()}
-            <input type="number" step="0.01" data-kind="${kind}" data-axis="${index}" value="${editorState.transforms.greenScreen[kind][index]}">
+            <input type="number" step="0.01" data-kind="${kind}" data-axis="${index}" value="${editorState.transforms.gaussianSplat[kind][index]}">
           </label>`).join('')).join('')}
       </div>
-      <div class="portal-editor__actions"><button type="button" class="portal-editor__save">Save backend world</button><button type="button" class="portal-editor__load">Load backend world</button></div><p>Position, rotation, and scale are applied live so green-screen planes, Gaussian splats, and GLB files can be placed precisely.</p>
+      <div class="portal-editor__actions"><button type="button" class="portal-editor__save">Save backend world</button><button type="button" class="portal-editor__load">Load backend world</button></div><p>Position, rotation, and scale are applied live so Gaussian splats and GLB files can be placed precisely inside the portal.</p>
     </details>
     <form class="agent-panel__form">
       <input aria-label="Ask the portal guide" placeholder="e.g. What should I notice here?" />
@@ -475,8 +478,15 @@ const buildAgentOverlay = () => {
     panel.dataset.trackingState = event.detail.state
     tracking.querySelector('strong').textContent = labels[event.detail.state]
     tracking.querySelector('span').textContent = event.detail.canEnter
-      ? '— ready to enter'
-      : '— waiting for 8th Wall SLAM tracking'
+      ? '— circle gesture can open the portal'
+      : '— waiting for 8th Wall Ground Tracking'
+  })
+
+  window.addEventListener('portal-hand-gesture-change', (event) => {
+    const instruction = panel.querySelector('.gesture-instruction')
+    instruction.querySelector('meter').value = event.detail.progress || 0
+    instruction.querySelector('span').textContent = event.detail.message
+    instruction.dataset.state = event.detail.state
   })
 
   window.addEventListener('portal-entry-change', (event) => {
@@ -511,6 +521,7 @@ const startOriginalPortal = () => {
     XR8.GlTextureRenderer.pipelineModule(),
     XR8.Threejs.pipelineModule(),
     XR8.XrController.pipelineModule(),
+    ...(XR8.HandController ? [XR8.HandController.pipelineModule()] : []),
     LandingPage.pipelineModule(),
     XRExtras.FullWindowCanvas.pipelineModule(),
     XRExtras.Loading.pipelineModule(),
@@ -519,6 +530,13 @@ const startOriginalPortal = () => {
   ])
 
   const canvas = document.getElementById('camerafeed')
+  let drawingFallback = false
+  canvas.addEventListener('pointerdown', () => { drawingFallback = true })
+  canvas.addEventListener('pointerup', () => { drawingFallback = false })
+  canvas.addEventListener('pointermove', (event) => {
+    if (!drawingFallback) return
+    window.dispatchEvent(new CustomEvent('portal-hand-point', {detail: {x: event.clientX, y: event.clientY, source: 'fallback'}}))
+  })
   XR8.run({canvas})
 }
 

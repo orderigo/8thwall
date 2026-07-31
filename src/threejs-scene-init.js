@@ -65,7 +65,6 @@ const makeTextTexture = (title, lines, accentColor = '#ffb04f') => {
 }
 
 const DEFAULT_WORLD_CONFIG = {
-  greenScreen: {position: [0, 1.18, -1.35], rotation: [0, Math.PI / 2, 0], scale: [1, 1, 1]},
   gaussianSplat: {
     source: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2',
     position: [0, 0, -1.2],
@@ -82,6 +81,10 @@ const PORTAL_ENTRY_DEPTH = 0.12
 const PORTAL_DRAG_SENSITIVITY = 0.0038
 const MAX_TAP_MOVEMENT = 10
 const WORLD_DISSOLVE_SPEED = 0.08
+const CIRCLE_COMPLETION_THRESHOLD = 0.72
+const HAND_TRAIL_POINTS = 96
+const TRAIL_CAMERA_DEPTH = -1.15
+
 
 const applyTransform = (object, transform = {}) => {
   if (!object) return
@@ -107,7 +110,8 @@ const createPortal = () => {
   const group = new THREE.Group()
   group.name = 'slam-magic-travel-portal'
   group.position.set(0, 1.35, -3.2)
-  group.scale.setScalar(DEFAULT_PORTAL_SCALE)
+  group.scale.setScalar(0.001)
+  group.visible = false
 
   const innerMaterial = new THREE.MeshBasicMaterial({
     map: makeTextTexture(DESTINATIONS[0].name, DESTINATIONS[0].facts, '#ffb04f'),
@@ -123,8 +127,14 @@ const createPortal = () => {
     transparent: true,
     opacity: 0.9,
   })
-  const outerRing = new THREE.Mesh(new THREE.TorusGeometry(1.08, 0.055, 16, 160), ringMaterial)
+  const outerRing = new THREE.Mesh(new THREE.TorusGeometry(1.08, 0.055, 24, 220), ringMaterial)
   group.add(outerRing)
+
+  const innerRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.86, 0.018, 12, 180),
+    new THREE.MeshBasicMaterial({color: 0x7ce0ff, transparent: true, opacity: 0.76})
+  )
+  group.add(innerRing)
 
   const runeGroup = new THREE.Group()
   const runeMaterial = new THREE.MeshBasicMaterial({color: 0xffd76b, transparent: true, opacity: 0.86})
@@ -139,16 +149,21 @@ const createPortal = () => {
 
   const sparkMaterial = new THREE.PointsMaterial({
     color: 0xffc05f,
-    size: 0.035,
+    size: 0.042,
     transparent: true,
     opacity: 0.95,
     depthWrite: false,
+    blending: THREE.AdditiveBlending,
   })
   const sparkPositions = []
-  for (let i = 0; i < 180; i++) {
+  const sparkAngles = []
+  const sparkRadii = []
+  for (let i = 0; i < 420; i++) {
     const angle = Math.random() * Math.PI * 2
-    const radius = 0.78 + Math.random() * 0.58
-    sparkPositions.push(Math.cos(angle) * radius, Math.sin(angle) * radius, (Math.random() - 0.5) * 0.18)
+    const radius = 0.78 + Math.random() * 0.66
+    sparkPositions.push(Math.cos(angle) * radius, Math.sin(angle) * radius, (Math.random() - 0.5) * 0.24)
+    sparkAngles.push(angle)
+    sparkRadii.push(radius)
   }
   const sparkGeometry = new THREE.BufferGeometry()
   sparkGeometry.setAttribute('position', new THREE.Float32BufferAttribute(sparkPositions, 3))
@@ -167,8 +182,12 @@ const createPortal = () => {
     innerWorld,
     innerMaterial,
     outerRing,
+    innerRing,
     runeGroup,
     sparks,
+    sparkAngles,
+    sparkRadii,
+    revealProgress: 0,
     destinationIndex: 0,
     baseScale: DEFAULT_PORTAL_SCALE,
   }
@@ -197,7 +216,6 @@ export const initScenePipelineModule = () => {
   let lumaSplats
   let agentVideo
   let portalWorld
-  let greenScreenPlane
   let glbScene
   let gltfLoader
   let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
@@ -212,6 +230,13 @@ export const initScenePipelineModule = () => {
   const dragRight = new THREE.Vector3()
   const dragUp = new THREE.Vector3()
   let entryAudioContext
+  let handTrail
+  let handTrailGeometry
+  let handTrailPositions
+  const handTrailPoints = []
+  let portalUnlockedByGesture = false
+  let hasHandTrackingInput = false
+  let fallbackPromptShown = false
   const dispatchTrackingStatus = () => {
     window.dispatchEvent(new CustomEvent('portal-tracking-change', {
       detail: {
@@ -237,6 +262,121 @@ export const initScenePipelineModule = () => {
       portalWorld.quaternion.copy(portal.quaternion)
     }
     dispatchTrackingStatus()
+  }
+
+
+  const updateInstruction = (detail) => {
+    window.dispatchEvent(new CustomEvent('portal-hand-gesture-change', {detail}))
+  }
+
+  const showFallbackPrompt = () => {
+    if (hasHandTrackingInput || fallbackPromptShown || portalUnlockedByGesture) return
+    fallbackPromptShown = true
+    updateInstruction({
+      state: 'fallback',
+      progress: 0,
+      message: 'Hand tracking is not available yet. Fallback: press and drag a full circle on the screen to summon the portal.',
+    })
+  }
+
+  const createHandTrail = (scene) => {
+    handTrailPositions = new Float32Array(HAND_TRAIL_POINTS * 3)
+    handTrailGeometry = new THREE.BufferGeometry()
+    handTrailGeometry.setAttribute('position', new THREE.BufferAttribute(handTrailPositions, 3))
+    const material = new THREE.PointsMaterial({
+      color: 0x7ce0ff,
+      size: 0.045,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+    handTrail = new THREE.Points(handTrailGeometry, material)
+    handTrail.frustumCulled = false
+    scene.add(handTrail)
+  }
+
+  const revealPortalFromGesture = () => {
+    if (portalUnlockedByGesture || !portal) return
+    portalUnlockedByGesture = true
+    portal.visible = true
+    placePortalInFrontOfCamera()
+    playPortalEntrySound()
+    updateInstruction({state: 'complete', progress: 1, message: 'Magic circle complete — portal opened on the ground plane.'})
+  }
+
+  const evaluateCircleGesture = () => {
+    if (handTrailPoints.length < 28) return 0
+    const first = handTrailPoints[0]
+    const last = handTrailPoints[handTrailPoints.length - 1]
+    const center = handTrailPoints.reduce((acc, point) => acc.add(point), new THREE.Vector3()).multiplyScalar(1 / handTrailPoints.length)
+    const radii = handTrailPoints.map((point) => point.distanceTo(center))
+    const radius = radii.reduce((sum, value) => sum + value, 0) / radii.length
+    const variance = radii.reduce((sum, value) => sum + Math.abs(value - radius), 0) / radii.length
+    const closed = THREE.MathUtils.clamp(1 - first.distanceTo(last) / Math.max(radius, 0.001), 0, 1)
+    const roundness = THREE.MathUtils.clamp(1 - variance / Math.max(radius * 0.55, 0.001), 0, 1)
+    const enoughSize = THREE.MathUtils.smoothstep(radius, 0.18, 0.42)
+    const progress = closed * 0.45 + roundness * 0.35 + enoughSize * 0.2
+    updateInstruction({state: 'drawing', progress, message: 'Trace a full circle with your index fingertip to summon the portal.'})
+    if (progress > CIRCLE_COMPLETION_THRESHOLD) revealPortalFromGesture()
+    return progress
+  }
+
+  const addHandTrailPoint = (screenX, screenY, source = 'fallback') => {
+    if (source === 'hand') hasHandTrackingInput = true
+    const {camera} = XR8.Threejs.xrScene()
+    const ndc = new THREE.Vector3((screenX / window.innerWidth) * 2 - 1, -(screenY / window.innerHeight) * 2 + 1, 0.5)
+    ndc.unproject(camera)
+    const direction = ndc.sub(camera.position).normalize()
+    const point = camera.position.clone().addScaledVector(direction, Math.abs(TRAIL_CAMERA_DEPTH / direction.z))
+    handTrailPoints.push(point)
+    if (handTrailPoints.length > HAND_TRAIL_POINTS) handTrailPoints.shift()
+    handTrailPoints.forEach((trailPoint, index) => {
+      handTrailPositions[index * 3] = trailPoint.x
+      handTrailPositions[index * 3 + 1] = trailPoint.y
+      handTrailPositions[index * 3 + 2] = trailPoint.z
+    })
+    handTrailGeometry.attributes.position.needsUpdate = true
+    handTrailGeometry.setDrawRange(0, handTrailPoints.length)
+    evaluateCircleGesture()
+  }
+
+  const vectorToScreenPoint = (position) => {
+    if (!position) return null
+    const {camera} = XR8.Threejs.xrScene()
+    const vector = Array.isArray(position)
+      ? new THREE.Vector3().fromArray(position)
+      : new THREE.Vector3(position.x, position.y, position.z)
+    vector.project(camera)
+    return {
+      x: (vector.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-vector.y * 0.5 + 0.5) * window.innerHeight,
+    }
+  }
+
+  const readIndexTip = (hands) => {
+    const hand = hands?.[0] || hands?.left || hands?.right || hands
+    return hand?.landmarks?.[8] || hand?.joints?.indexFingerTip || hand?.indexTip || hand?.indexFingerTip
+  }
+
+  const readAttachmentIndexTip = (detail) => {
+    const attachments = detail?.attachmentPoints || detail?.attachments || detail?.hand?.attachmentPoints
+    return attachments?.indexNail || attachments?.indexTip || attachments?.indexUpper || attachments?.indexFingerTip
+  }
+
+  const addPointFromHandEvent = (event) => {
+    const attachmentTip = readAttachmentIndexTip(event.detail)
+    if (attachmentTip?.position) {
+      const screenPoint = vectorToScreenPoint(attachmentTip.position)
+      if (screenPoint) addHandTrailPoint(screenPoint.x, screenPoint.y, 'hand')
+      return
+    }
+
+    const tip = readIndexTip(event.detail?.hands || event.detail?.hand || event.detail)
+    if (!tip) return
+    const x = tip.x <= 1 ? tip.x * window.innerWidth : tip.x
+    const y = tip.y <= 1 ? tip.y * window.innerHeight : tip.y
+    addHandTrailPoint(x, y, 'hand')
   }
 
   const playPortalEntrySound = () => {
@@ -283,17 +423,6 @@ export const initScenePipelineModule = () => {
     portalWorld.visible = false
     scene.add(portalWorld)
 
-    const greenMaterial = new THREE.MeshBasicMaterial({
-      color: 0x00ff66,
-      transparent: true,
-      opacity: 0.68,
-      side: THREE.DoubleSide,
-    })
-    greenScreenPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), greenMaterial)
-    greenScreenPlane.name = 'editable-green-screen-plane'
-    applyTransform(greenScreenPlane, worldConfig.greenScreen)
-    portalWorld.add(greenScreenPlane)
-
     lumaSplats = new LumaSplatsThree({
       source: worldConfig.gaussianSplat.source,
       loadingAnimationEnabled: false,
@@ -310,6 +439,7 @@ export const initScenePipelineModule = () => {
     }
 
     gltfLoader = new GLTFLoader()
+    createHandTrail(scene)
 
     portal = createPortal()
     scene.add(portal)
@@ -330,6 +460,11 @@ export const initScenePipelineModule = () => {
 
   return {
     name: 'threejsinitscene',
+    listeners: [
+      {event: 'handcontroller.handfound', process: addPointFromHandEvent},
+      {event: 'handcontroller.handupdated', process: addPointFromHandEvent},
+      {event: 'handcontroller.handlost', process: showFallbackPrompt},
+    ],
 
     onStart: ({canvas}) => {
       const {scene, camera, renderer} = XR8.Threejs.xrScene()
@@ -399,7 +534,11 @@ export const initScenePipelineModule = () => {
         }, true
       )
 
-      window.addEventListener('portal-recenter-request', placePortalInFrontOfCamera)
+      window.addEventListener('portal-recenter-request', () => { portalUnlockedByGesture = true; if (portal) portal.visible = true; placePortalInFrontOfCamera() })
+      window.addEventListener('portal-hand-point', (event) => addHandTrailPoint(event.detail.x, event.detail.y, event.detail.source))
+      window.addEventListener('handcontroller.handfound', addPointFromHandEvent)
+      window.addEventListener('handcontroller.handupdated', addPointFromHandEvent)
+      window.setTimeout(showFallbackPrompt, 4500)
       window.addEventListener('portal-dissolve-toggle', () => {
         dissolveRealWorld = !dissolveRealWorld
         window.dispatchEvent(new CustomEvent('portal-dissolve-change', {detail: {enabled: dissolveRealWorld}}))
@@ -419,7 +558,6 @@ export const initScenePipelineModule = () => {
         const {target, transform, url} = event.detail
         if (!worldConfig[target]) return
         if (transform) worldConfig[target] = {...worldConfig[target], ...transform}
-        if (target === 'greenScreen') applyTransform(greenScreenPlane, worldConfig.greenScreen)
         if (target === 'gaussianSplat') applyTransform(lumaSplats, worldConfig.gaussianSplat)
         if (target === 'glb') {
           if (url !== undefined) worldConfig.glb.url = url
@@ -439,7 +577,7 @@ export const initScenePipelineModule = () => {
 
       canvas.addEventListener('touchend', (event) => {
         if (activeTouchMode === 'drag' && event.touches.length === 0 && dragTotalMovement < MAX_TAP_MOVEMENT) {
-          updateDestination(portal)
+          if (portal.visible) updateDestination(portal)
         }
 
         if (event.touches.length === 0) {
@@ -447,6 +585,14 @@ export const initScenePipelineModule = () => {
           pinchStartDistance = 0
         }
       })
+    },
+
+    onProcessCpu: ({processCpuResult}) => {
+      const tip = readIndexTip(processCpuResult?.hands || processCpuResult?.handDetections || processCpuResult?.handTracking)
+      if (!tip) return
+      const x = tip.x <= 1 ? tip.x * window.innerWidth : tip.x
+      const y = tip.y <= 1 ? tip.y * window.innerHeight : tip.y
+      addHandTrailPoint(x, y, 'hand')
     },
 
     onUpdate: () => {
@@ -503,11 +649,20 @@ export const initScenePipelineModule = () => {
       }
       worldOpacity += ((dissolveRealWorld ? 0.34 : 1) - worldOpacity) * WORLD_DISSOLVE_SPEED
       if (portalWorld) setObjectOpacity(portalWorld, worldOpacity)
-      portal.scale.setScalar(portal.userData.baseScale * (isInsidePortal ? 0.001 : 1))
+      portal.userData.revealProgress += ((portalUnlockedByGesture ? 1 : 0) - portal.userData.revealProgress) * 0.08
+      portal.scale.setScalar(portal.userData.baseScale * (isInsidePortal ? 0.001 : Math.max(0.001, portal.userData.revealProgress)))
       portal.userData.outerRing.material.opacity = isInsidePortal ? 0 : 0.9
       portal.userData.innerMaterial.opacity = isInsidePortal ? 0 : 0.94
       portal.userData.outerRing.rotation.z = elapsed * 0.85
       portal.userData.runeGroup.rotation.z = -elapsed * 0.55
+      portal.userData.innerRing.rotation.z = -elapsed * 1.35
+      const positions = portal.userData.sparks.geometry.attributes.position
+      for (let i = 0; i < portal.userData.sparkAngles.length; i++) {
+        const angle = portal.userData.sparkAngles[i] + elapsed * (0.75 + (i % 7) * 0.04)
+        const radius = portal.userData.sparkRadii[i] + Math.sin(elapsed * 3 + i) * 0.035
+        positions.setXYZ(i, Math.cos(angle) * radius, Math.sin(angle) * radius, Math.sin(elapsed * 4 + i) * 0.12)
+      }
+      positions.needsUpdate = true
       portal.userData.sparks.rotation.z = elapsed * 0.32
       portal.userData.innerWorld.scale.setScalar(1 + Math.sin(elapsed * 2.4) * 0.018)
       if (agentVideo) agentVideo.update(camera)
