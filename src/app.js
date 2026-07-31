@@ -327,7 +327,7 @@ const buildAgentOverlay = () => {
     </div>
     <div class="gesture-instruction" aria-live="polite">
       <strong>လက်ညိုးထိပ်နဲ့ စက်ဝိုင်းဆွဲပါ</strong>
-      <span>Point your index finger at the camera and draw one complete circle to reveal the magic portal ring.</span>
+      <span>Point your index finger at the camera and draw one complete circle. If hand tracking does not start, press and drag a circle on the screen as fallback.</span>
       <meter min="0" max="1" value="0"></meter>
     </div>
     <div class="agent-panel__log" aria-live="polite">
@@ -521,6 +521,7 @@ const startOriginalPortal = () => {
     XR8.GlTextureRenderer.pipelineModule(),
     XR8.Threejs.pipelineModule(),
     XR8.XrController.pipelineModule(),
+    ...(XR8.HandController ? [XR8.HandController.pipelineModule()] : []),
     LandingPage.pipelineModule(),
     XRExtras.FullWindowCanvas.pipelineModule(),
     XRExtras.Loading.pipelineModule(),
@@ -534,7 +535,7 @@ const startOriginalPortal = () => {
   canvas.addEventListener('pointerup', () => { drawingFallback = false })
   canvas.addEventListener('pointermove', (event) => {
     if (!drawingFallback) return
-    window.dispatchEvent(new CustomEvent('portal-hand-point', {detail: {x: event.clientX, y: event.clientY}}))
+    window.dispatchEvent(new CustomEvent('portal-hand-point', {detail: {x: event.clientX, y: event.clientY, source: 'fallback'}}))
   })
   XR8.run({canvas})
 }

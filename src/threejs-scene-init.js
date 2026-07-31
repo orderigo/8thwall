@@ -235,6 +235,8 @@ export const initScenePipelineModule = () => {
   let handTrailPositions
   const handTrailPoints = []
   let portalUnlockedByGesture = false
+  let hasHandTrackingInput = false
+  let fallbackPromptShown = false
   const dispatchTrackingStatus = () => {
     window.dispatchEvent(new CustomEvent('portal-tracking-change', {
       detail: {
@@ -265,6 +267,16 @@ export const initScenePipelineModule = () => {
 
   const updateInstruction = (detail) => {
     window.dispatchEvent(new CustomEvent('portal-hand-gesture-change', {detail}))
+  }
+
+  const showFallbackPrompt = () => {
+    if (hasHandTrackingInput || fallbackPromptShown || portalUnlockedByGesture) return
+    fallbackPromptShown = true
+    updateInstruction({
+      state: 'fallback',
+      progress: 0,
+      message: 'Hand tracking is not available yet. Fallback: press and drag a full circle on the screen to summon the portal.',
+    })
   }
 
   const createHandTrail = (scene) => {
@@ -310,7 +322,8 @@ export const initScenePipelineModule = () => {
     return progress
   }
 
-  const addHandTrailPoint = (screenX, screenY) => {
+  const addHandTrailPoint = (screenX, screenY, source = 'fallback') => {
+    if (source === 'hand') hasHandTrackingInput = true
     const {camera} = XR8.Threejs.xrScene()
     const ndc = new THREE.Vector3((screenX / window.innerWidth) * 2 - 1, -(screenY / window.innerHeight) * 2 + 1, 0.5)
     ndc.unproject(camera)
@@ -328,9 +341,42 @@ export const initScenePipelineModule = () => {
     evaluateCircleGesture()
   }
 
+  const vectorToScreenPoint = (position) => {
+    if (!position) return null
+    const {camera} = XR8.Threejs.xrScene()
+    const vector = Array.isArray(position)
+      ? new THREE.Vector3().fromArray(position)
+      : new THREE.Vector3(position.x, position.y, position.z)
+    vector.project(camera)
+    return {
+      x: (vector.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-vector.y * 0.5 + 0.5) * window.innerHeight,
+    }
+  }
+
   const readIndexTip = (hands) => {
-    const hand = hands?.[0] || hands?.left || hands?.right
+    const hand = hands?.[0] || hands?.left || hands?.right || hands
     return hand?.landmarks?.[8] || hand?.joints?.indexFingerTip || hand?.indexTip || hand?.indexFingerTip
+  }
+
+  const readAttachmentIndexTip = (detail) => {
+    const attachments = detail?.attachmentPoints || detail?.attachments || detail?.hand?.attachmentPoints
+    return attachments?.indexNail || attachments?.indexTip || attachments?.indexUpper || attachments?.indexFingerTip
+  }
+
+  const addPointFromHandEvent = (event) => {
+    const attachmentTip = readAttachmentIndexTip(event.detail)
+    if (attachmentTip?.position) {
+      const screenPoint = vectorToScreenPoint(attachmentTip.position)
+      if (screenPoint) addHandTrailPoint(screenPoint.x, screenPoint.y, 'hand')
+      return
+    }
+
+    const tip = readIndexTip(event.detail?.hands || event.detail?.hand || event.detail)
+    if (!tip) return
+    const x = tip.x <= 1 ? tip.x * window.innerWidth : tip.x
+    const y = tip.y <= 1 ? tip.y * window.innerHeight : tip.y
+    addHandTrailPoint(x, y, 'hand')
   }
 
   const playPortalEntrySound = () => {
@@ -414,6 +460,11 @@ export const initScenePipelineModule = () => {
 
   return {
     name: 'threejsinitscene',
+    listeners: [
+      {event: 'handcontroller.handfound', process: addPointFromHandEvent},
+      {event: 'handcontroller.handupdated', process: addPointFromHandEvent},
+      {event: 'handcontroller.handlost', process: showFallbackPrompt},
+    ],
 
     onStart: ({canvas}) => {
       const {scene, camera, renderer} = XR8.Threejs.xrScene()
@@ -484,7 +535,10 @@ export const initScenePipelineModule = () => {
       )
 
       window.addEventListener('portal-recenter-request', () => { portalUnlockedByGesture = true; if (portal) portal.visible = true; placePortalInFrontOfCamera() })
-      window.addEventListener('portal-hand-point', (event) => addHandTrailPoint(event.detail.x, event.detail.y))
+      window.addEventListener('portal-hand-point', (event) => addHandTrailPoint(event.detail.x, event.detail.y, event.detail.source))
+      window.addEventListener('handcontroller.handfound', addPointFromHandEvent)
+      window.addEventListener('handcontroller.handupdated', addPointFromHandEvent)
+      window.setTimeout(showFallbackPrompt, 4500)
       window.addEventListener('portal-dissolve-toggle', () => {
         dissolveRealWorld = !dissolveRealWorld
         window.dispatchEvent(new CustomEvent('portal-dissolve-change', {detail: {enabled: dissolveRealWorld}}))
@@ -538,7 +592,7 @@ export const initScenePipelineModule = () => {
       if (!tip) return
       const x = tip.x <= 1 ? tip.x * window.innerWidth : tip.x
       const y = tip.y <= 1 ? tip.y * window.innerHeight : tip.y
-      addHandTrailPoint(x, y)
+      addHandTrailPoint(x, y, 'hand')
     },
 
     onUpdate: () => {
