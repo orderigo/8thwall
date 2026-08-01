@@ -321,17 +321,17 @@ const buildAgentOverlay = () => {
     </div>
     <p class="agent-panel__destination">Destination: <strong>Bagan, Myanmar</strong></p>
     <div class="agent-panel__tracking">
-      <p>8th Wall Ground Tracking: <strong>Stable</strong> <span>— draw the circle first</span></p>
-      <button class="agent-panel__recenter" type="button">Recenter portal</button>
-      <button class="agent-panel__dissolve" type="button" aria-pressed="false">Dissolve real world</button>
+      <p>8th Wall Ground Tracking: <strong>Stable</strong> <span>— choose a ground point</span></p>
+      <button class="agent-panel__recenter" type="button">Choose ground point</button>
+      <button class="agent-panel__open" type="button">Open Portal</button>
     </div>
     <div class="gesture-instruction" aria-live="polite">
-      <strong>လက်ညိုးထိပ်နဲ့ စက်ဝိုင်းဆွဲပါ</strong>
-      <span>Point your index finger at the camera and draw one complete circle. If hand tracking does not start, press and drag a circle on the screen as fallback.</span>
-      <meter min="0" max="1" value="0"></meter>
+      <strong>Ground tracking point ကိုရွေးပါ</strong>
+      <span>Move your phone, tap the animated ground point position, then press Open Portal.</span>
+      <meter min="0" max="1" value="1"></meter>
     </div>
     <div class="agent-panel__log" aria-live="polite">
-      <p><strong>Agent:</strong> Welcome to the Original Portal. Hold your hand in front of the camera, trace a full circle with your index fingertip, and the particle trail will summon the ground-tracked portal ring.</p>
+      <p><strong>Agent:</strong> Welcome to the Door Portal. Select the animated ground tracking point, press Open Portal, and walk closer so the door opens for you.</p>
     </div>
     <section class="portal-editor-access" aria-label="Portal editor access">
       <button class="portal-editor-access__toggle" type="button" aria-expanded="false">Editor access</button>
@@ -367,7 +367,7 @@ const buildAgentOverlay = () => {
   const log = panel.querySelector('.agent-panel__log')
   const tracking = panel.querySelector('.agent-panel__tracking')
   const recenterButton = panel.querySelector('.agent-panel__recenter')
-  const dissolveButton = panel.querySelector('.agent-panel__dissolve')
+  const openButton = panel.querySelector('.agent-panel__open')
   const editorAccess = panel.querySelector('.portal-editor-access')
   const editorAccessToggle = panel.querySelector('.portal-editor-access__toggle')
   const editorAccessForm = panel.querySelector('.portal-editor-access__form')
@@ -419,13 +419,8 @@ const buildAgentOverlay = () => {
     window.dispatchEvent(new CustomEvent('portal-recenter-request'))
   })
 
-  dissolveButton.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('portal-dissolve-toggle'))
-  })
-
-  window.addEventListener('portal-dissolve-change', (event) => {
-    dissolveButton.setAttribute('aria-pressed', String(event.detail.enabled))
-    dissolveButton.textContent = event.detail.enabled ? 'Restore portal world' : 'Dissolve real world'
+  openButton.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('portal-open-request'))
   })
 
   const editorControls = [...editor.querySelectorAll('[data-kind]')]
@@ -478,19 +473,19 @@ const buildAgentOverlay = () => {
     panel.dataset.trackingState = event.detail.state
     tracking.querySelector('strong').textContent = labels[event.detail.state]
     tracking.querySelector('span').textContent = event.detail.canEnter
-      ? '— circle gesture can open the portal'
-      : '— waiting for 8th Wall Ground Tracking'
+      ? '— door portal is placed'
+      : '— waiting for a ground point'
   })
 
-  window.addEventListener('portal-hand-gesture-change', (event) => {
+  window.addEventListener('portal-placement-change', (event) => {
     const instruction = panel.querySelector('.gesture-instruction')
-    instruction.querySelector('meter').value = event.detail.progress || 0
+    instruction.querySelector('meter').value = event.detail.state === 'opened' ? 1 : 0.55
     instruction.querySelector('span').textContent = event.detail.message
     instruction.dataset.state = event.detail.state
   })
 
   window.addEventListener('portal-entry-change', (event) => {
-    const status = event.detail.isInsidePortal ? 'Inside editable portal world' : 'Original Portal threshold'
+    const status = event.detail.isInsidePortal ? 'Inside editable portal world' : 'Door Portal threshold'
     panel.dataset.portalState = event.detail.isInsidePortal ? 'inside' : 'outside'
     panel.querySelector('h1').textContent = status
   })
@@ -521,7 +516,6 @@ const startOriginalPortal = () => {
     XR8.GlTextureRenderer.pipelineModule(),
     XR8.Threejs.pipelineModule(),
     XR8.XrController.pipelineModule(),
-    ...(XR8.HandController ? [XR8.HandController.pipelineModule()] : []),
     LandingPage.pipelineModule(),
     XRExtras.FullWindowCanvas.pipelineModule(),
     XRExtras.Loading.pipelineModule(),
@@ -530,13 +524,6 @@ const startOriginalPortal = () => {
   ])
 
   const canvas = document.getElementById('camerafeed')
-  let drawingFallback = false
-  canvas.addEventListener('pointerdown', () => { drawingFallback = true })
-  canvas.addEventListener('pointerup', () => { drawingFallback = false })
-  canvas.addEventListener('pointermove', (event) => {
-    if (!drawingFallback) return
-    window.dispatchEvent(new CustomEvent('portal-hand-point', {detail: {x: event.clientX, y: event.clientY, source: 'fallback'}}))
-  })
   XR8.run({canvas})
 }
 

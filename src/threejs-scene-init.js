@@ -1,8 +1,9 @@
-// Defines an 8th Wall XR Camera Pipeline Module that anchors a Dr. Strange-inspired
-// travel portal into the SLAM-tracked world and keeps it animated with three.js.
+// Defines an 8th Wall XR Camera Pipeline Module that places a ground-tracked
+// door portal and opens the animated door as the visitor approaches it.
 import * as THREE from 'three'
 import {LumaSplatsThree} from '@lumaai/luma-web'
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js'
+import doorModelUrl from './assets/lowpoly_animated_doors_blender_file.glb?url'
 import {AgentVideo} from './agentvideo'
 
 const DESTINATIONS = [
@@ -23,47 +24,6 @@ const DESTINATIONS = [
   },
 ]
 
-const makeTextTexture = (title, lines, accentColor = '#ffb04f') => {
-  const canvas = document.createElement('canvas')
-  canvas.width = 1024
-  canvas.height = 1024
-  const context = canvas.getContext('2d')
-
-  const gradient = context.createLinearGradient(0, 0, 1024, 1024)
-  gradient.addColorStop(0, '#102243')
-  gradient.addColorStop(0.55, '#38205f')
-  gradient.addColorStop(1, '#07111f')
-  context.fillStyle = gradient
-  context.fillRect(0, 0, 1024, 1024)
-
-  context.fillStyle = 'rgba(255, 255, 255, 0.14)'
-  for (let i = 0; i < 36; i++) {
-    const x = Math.random() * 1024
-    const y = Math.random() * 1024
-    const radius = 2 + Math.random() * 7
-    context.beginPath()
-    context.arc(x, y, radius, 0, Math.PI * 2)
-    context.fill()
-  }
-
-  context.fillStyle = accentColor
-  context.font = '700 76px sans-serif'
-  context.textAlign = 'center'
-  context.fillText(title, 512, 190)
-
-  context.fillStyle = '#f7fbff'
-  context.font = '500 44px sans-serif'
-  lines.forEach((line, index) => context.fillText(line, 512, 360 + index * 92))
-
-  context.fillStyle = 'rgba(255, 255, 255, 0.82)'
-  context.font = '600 34px sans-serif'
-  context.fillText('Step closer and ask the portal guide', 512, 850)
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  return texture
-}
-
 const DEFAULT_WORLD_CONFIG = {
   gaussianSplat: {
     source: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2',
@@ -73,18 +33,16 @@ const DEFAULT_WORLD_CONFIG = {
   },
   glb: {url: '', position: [0.72, 0, -1.6], rotation: [0, 0, 0], scale: [1, 1, 1]},
 }
-const DEFAULT_PORTAL_SCALE = 2
-const MIN_PORTAL_SCALE = 0.35
-const PORTAL_ENTRY_RADIUS = 0.82
-const PORTAL_EXIT_RADIUS = 1.04
-const PORTAL_ENTRY_DEPTH = 0.12
+
+const DOOR_REAL_WORLD_HEIGHT_METERS = 2.15
+const DOOR_OPEN_DISTANCE_METERS = 1.35
+const DOOR_CLOSE_DISTANCE_METERS = 1.8
+const PORTAL_ENTRY_RADIUS = 0.7
+const PORTAL_EXIT_RADIUS = 1.05
+const PORTAL_ENTRY_DEPTH = 0.2
 const PORTAL_DRAG_SENSITIVITY = 0.0038
 const MAX_TAP_MOVEMENT = 10
-const WORLD_DISSOLVE_SPEED = 0.08
-const CIRCLE_COMPLETION_THRESHOLD = 0.72
-const HAND_TRAIL_POINTS = 96
-const TRAIL_CAMERA_DEPTH = -1.15
-
+const PLACEMENT_DISTANCE_METERS = 2.6
 
 const applyTransform = (object, transform = {}) => {
   if (!object) return
@@ -94,325 +52,218 @@ const applyTransform = (object, transform = {}) => {
   if (scale) object.scale.fromArray(scale)
 }
 
-const setObjectOpacity = (object, opacity) => {
-  object.traverse((child) => {
-    if (!child.material) return
-    const materials = Array.isArray(child.material) ? child.material : [child.material]
-    materials.forEach((material) => {
-      material.transparent = true
-      material.opacity = opacity
-      material.needsUpdate = true
-    })
-  })
+const fitObjectToHeight = (object, targetHeight) => {
+  const box = new THREE.Box3().setFromObject(object)
+  const size = box.getSize(new THREE.Vector3())
+  const height = size.y || 1
+  const scale = targetHeight / height
+  object.scale.multiplyScalar(scale)
+  box.setFromObject(object)
+  const center = box.getCenter(new THREE.Vector3())
+  const minY = box.min.y
+  object.position.sub(new THREE.Vector3(center.x, minY, center.z))
+  return scale
 }
 
-const createPortal = () => {
-  const group = new THREE.Group()
-  group.name = 'slam-magic-travel-portal'
-  group.position.set(0, 1.35, -3.2)
-  group.scale.setScalar(0.001)
-  group.visible = false
-
-  const innerMaterial = new THREE.MeshBasicMaterial({
-    map: makeTextTexture(DESTINATIONS[0].name, DESTINATIONS[0].facts, '#ffb04f'),
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.94,
-  })
-  const innerWorld = new THREE.Mesh(new THREE.CircleGeometry(0.95, 96), innerMaterial)
-  group.add(innerWorld)
-
-  const ringMaterial = new THREE.MeshBasicMaterial({
-    color: DESTINATIONS[0].color,
-    transparent: true,
-    opacity: 0.9,
-  })
-  const outerRing = new THREE.Mesh(new THREE.TorusGeometry(1.08, 0.055, 24, 220), ringMaterial)
-  group.add(outerRing)
-
-  const innerRing = new THREE.Mesh(
-    new THREE.TorusGeometry(0.86, 0.018, 12, 180),
-    new THREE.MeshBasicMaterial({color: 0x7ce0ff, transparent: true, opacity: 0.76})
-  )
-  group.add(innerRing)
-
-  const runeGroup = new THREE.Group()
-  const runeMaterial = new THREE.MeshBasicMaterial({color: 0xffd76b, transparent: true, opacity: 0.86})
-  for (let i = 0; i < 28; i++) {
-    const rune = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.018, 0.012), runeMaterial)
-    const angle = (i / 28) * Math.PI * 2
-    rune.position.set(Math.cos(angle) * 1.22, Math.sin(angle) * 1.22, 0.025)
-    rune.rotation.z = angle
-    runeGroup.add(rune)
-  }
-  group.add(runeGroup)
-
-  const sparkMaterial = new THREE.PointsMaterial({
-    color: 0xffc05f,
-    size: 0.042,
-    transparent: true,
-    opacity: 0.95,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  })
-  const sparkPositions = []
-  const sparkAngles = []
-  const sparkRadii = []
-  for (let i = 0; i < 420; i++) {
-    const angle = Math.random() * Math.PI * 2
-    const radius = 0.78 + Math.random() * 0.66
-    sparkPositions.push(Math.cos(angle) * radius, Math.sin(angle) * radius, (Math.random() - 0.5) * 0.24)
-    sparkAngles.push(angle)
-    sparkRadii.push(radius)
-  }
-  const sparkGeometry = new THREE.BufferGeometry()
-  sparkGeometry.setAttribute('position', new THREE.Float32BufferAttribute(sparkPositions, 3))
-  const sparks = new THREE.Points(sparkGeometry, sparkMaterial)
-  group.add(sparks)
-
-  const pedestal = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.9, 1.18, 0.08, 96),
-    new THREE.MeshStandardMaterial({color: 0x1a2945, roughness: 0.8, metalness: 0.2})
-  )
-  pedestal.position.set(0, -1.08, 0)
-  pedestal.receiveShadow = true
-  group.add(pedestal)
-
-  group.userData = {
-    innerWorld,
-    innerMaterial,
-    outerRing,
-    innerRing,
-    runeGroup,
-    sparks,
-    sparkAngles,
-    sparkRadii,
-    revealProgress: 0,
-    destinationIndex: 0,
-    baseScale: DEFAULT_PORTAL_SCALE,
-  }
-  return group
-}
-
-const updateDestination = (portal) => {
-  const nextIndex = (portal.userData.destinationIndex + 1) % DESTINATIONS.length
-  const destination = DESTINATIONS[nextIndex]
-  portal.userData.destinationIndex = nextIndex
-  portal.userData.innerMaterial.map.dispose()
-  portal.userData.innerMaterial.map = makeTextTexture(
-    destination.name,
-    destination.facts,
-    `#${destination.color.toString(16).padStart(6, '0')}`
-  )
-  portal.userData.innerMaterial.needsUpdate = true
-  portal.userData.outerRing.material.color.set(destination.color)
-  window.dispatchEvent(new CustomEvent('portal-destination-change', {detail: destination}))
-}
-
-export const initScenePipelineModule = () => {
-  const clock = new THREE.Clock()
-  let portal
-  let isInsidePortal = false
-  let lumaSplats
-  let agentVideo
-  let portalWorld
-  let glbScene
-  let gltfLoader
-  let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
-  let dissolveRealWorld = false
-  let vrTourMode = false
-  let vrMoveDirection = null
-  const vrTourOffset = new THREE.Vector3()
-  let worldOpacity = 1
-  let smoothedCameraPosition = new THREE.Vector3()
-  let hasSmoothedCameraPosition = false
-  const cameraPortalPosition = new THREE.Vector3()
-  const dragRight = new THREE.Vector3()
-  const dragUp = new THREE.Vector3()
+const playPortalEntrySound = (() => {
   let entryAudioContext
-  let handTrail
-  let handTrailGeometry
-  let handTrailPositions
-  const handTrailPoints = []
-  let portalUnlockedByGesture = false
-  let hasHandTrackingInput = false
-  let fallbackPromptShown = false
-  const dispatchTrackingStatus = () => {
-    window.dispatchEvent(new CustomEvent('portal-tracking-change', {
-      detail: {
-        canEnter: true,
-        source: '8th-wall-slam',
-        state: 'stable',
-      },
-    }))
-  }
-
-  const placePortalInFrontOfCamera = () => {
-    if (!portal) return
-
-    const {camera} = XR8.Threejs.xrScene()
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
-    const target = camera.position.clone().addScaledVector(forward, 3.2)
-    portal.position.set(target.x, Math.max(1.05, target.y), target.z)
-    portal.quaternion.copy(camera.quaternion)
-    portal.rotation.x = 0
-    portal.rotation.z = 0
-    if (portalWorld) {
-      portalWorld.position.copy(portal.position)
-      portalWorld.quaternion.copy(portal.quaternion)
-    }
-    dispatchTrackingStatus()
-  }
-
-
-  const updateInstruction = (detail) => {
-    window.dispatchEvent(new CustomEvent('portal-hand-gesture-change', {detail}))
-  }
-
-  const showFallbackPrompt = () => {
-    if (hasHandTrackingInput || fallbackPromptShown || portalUnlockedByGesture) return
-    fallbackPromptShown = true
-    updateInstruction({
-      state: 'fallback',
-      progress: 0,
-      message: 'Hand tracking is not available yet. Fallback: press and drag a full circle on the screen to summon the portal.',
-    })
-  }
-
-  const createHandTrail = (scene) => {
-    handTrailPositions = new Float32Array(HAND_TRAIL_POINTS * 3)
-    handTrailGeometry = new THREE.BufferGeometry()
-    handTrailGeometry.setAttribute('position', new THREE.BufferAttribute(handTrailPositions, 3))
-    const material = new THREE.PointsMaterial({
-      color: 0x7ce0ff,
-      size: 0.045,
-      transparent: true,
-      opacity: 0.92,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    })
-    handTrail = new THREE.Points(handTrailGeometry, material)
-    handTrail.frustumCulled = false
-    scene.add(handTrail)
-  }
-
-  const revealPortalFromGesture = () => {
-    if (portalUnlockedByGesture || !portal) return
-    portalUnlockedByGesture = true
-    portal.visible = true
-    placePortalInFrontOfCamera()
-    playPortalEntrySound()
-    updateInstruction({state: 'complete', progress: 1, message: 'Magic circle complete — portal opened on the ground plane.'})
-  }
-
-  const evaluateCircleGesture = () => {
-    if (handTrailPoints.length < 28) return 0
-    const first = handTrailPoints[0]
-    const last = handTrailPoints[handTrailPoints.length - 1]
-    const center = handTrailPoints.reduce((acc, point) => acc.add(point), new THREE.Vector3()).multiplyScalar(1 / handTrailPoints.length)
-    const radii = handTrailPoints.map((point) => point.distanceTo(center))
-    const radius = radii.reduce((sum, value) => sum + value, 0) / radii.length
-    const variance = radii.reduce((sum, value) => sum + Math.abs(value - radius), 0) / radii.length
-    const closed = THREE.MathUtils.clamp(1 - first.distanceTo(last) / Math.max(radius, 0.001), 0, 1)
-    const roundness = THREE.MathUtils.clamp(1 - variance / Math.max(radius * 0.55, 0.001), 0, 1)
-    const enoughSize = THREE.MathUtils.smoothstep(radius, 0.18, 0.42)
-    const progress = closed * 0.45 + roundness * 0.35 + enoughSize * 0.2
-    updateInstruction({state: 'drawing', progress, message: 'Trace a full circle with your index fingertip to summon the portal.'})
-    if (progress > CIRCLE_COMPLETION_THRESHOLD) revealPortalFromGesture()
-    return progress
-  }
-
-  const addHandTrailPoint = (screenX, screenY, source = 'fallback') => {
-    if (source === 'hand') hasHandTrackingInput = true
-    const {camera} = XR8.Threejs.xrScene()
-    const ndc = new THREE.Vector3((screenX / window.innerWidth) * 2 - 1, -(screenY / window.innerHeight) * 2 + 1, 0.5)
-    ndc.unproject(camera)
-    const direction = ndc.sub(camera.position).normalize()
-    const point = camera.position.clone().addScaledVector(direction, Math.abs(TRAIL_CAMERA_DEPTH / direction.z))
-    handTrailPoints.push(point)
-    if (handTrailPoints.length > HAND_TRAIL_POINTS) handTrailPoints.shift()
-    handTrailPoints.forEach((trailPoint, index) => {
-      handTrailPositions[index * 3] = trailPoint.x
-      handTrailPositions[index * 3 + 1] = trailPoint.y
-      handTrailPositions[index * 3 + 2] = trailPoint.z
-    })
-    handTrailGeometry.attributes.position.needsUpdate = true
-    handTrailGeometry.setDrawRange(0, handTrailPoints.length)
-    evaluateCircleGesture()
-  }
-
-  const vectorToScreenPoint = (position) => {
-    if (!position) return null
-    const {camera} = XR8.Threejs.xrScene()
-    const vector = Array.isArray(position)
-      ? new THREE.Vector3().fromArray(position)
-      : new THREE.Vector3(position.x, position.y, position.z)
-    vector.project(camera)
-    return {
-      x: (vector.x * 0.5 + 0.5) * window.innerWidth,
-      y: (-vector.y * 0.5 + 0.5) * window.innerHeight,
-    }
-  }
-
-  const readIndexTip = (hands) => {
-    const hand = hands?.[0] || hands?.left || hands?.right || hands
-    return hand?.landmarks?.[8] || hand?.joints?.indexFingerTip || hand?.indexTip || hand?.indexFingerTip
-  }
-
-  const readAttachmentIndexTip = (detail) => {
-    const attachments = detail?.attachmentPoints || detail?.attachments || detail?.hand?.attachmentPoints
-    return attachments?.indexNail || attachments?.indexTip || attachments?.indexUpper || attachments?.indexFingerTip
-  }
-
-  const addPointFromHandEvent = (event) => {
-    const attachmentTip = readAttachmentIndexTip(event.detail)
-    if (attachmentTip?.position) {
-      const screenPoint = vectorToScreenPoint(attachmentTip.position)
-      if (screenPoint) addHandTrailPoint(screenPoint.x, screenPoint.y, 'hand')
-      return
-    }
-
-    const tip = readIndexTip(event.detail?.hands || event.detail?.hand || event.detail)
-    if (!tip) return
-    const x = tip.x <= 1 ? tip.x * window.innerWidth : tip.x
-    const y = tip.y <= 1 ? tip.y * window.innerHeight : tip.y
-    addHandTrailPoint(x, y, 'hand')
-  }
-
-  const playPortalEntrySound = () => {
+  return () => {
     const AudioContext = window.AudioContext || window.webkitAudioContext
     if (!AudioContext) return
 
     entryAudioContext ||= new AudioContext()
-    if (entryAudioContext.state === 'suspended') {
-      entryAudioContext.resume()
-    }
+    if (entryAudioContext.state === 'suspended') entryAudioContext.resume()
 
     const now = entryAudioContext.currentTime
     const gain = entryAudioContext.createGain()
     gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.exponentialRampToValueAtTime(0.28, now + 0.05)
+    gain.gain.exponentialRampToValueAtTime(0.24, now + 0.05)
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9)
     gain.connect(entryAudioContext.destination)
 
-    ;[392, 523.25, 783.99].forEach((frequency, index) => {
+    ;[220, 329.63, 440].forEach((frequency, index) => {
       const oscillator = entryAudioContext.createOscillator()
       oscillator.type = index === 0 ? 'sine' : 'triangle'
       oscillator.frequency.setValueAtTime(frequency, now)
-      oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.18, now + 0.65)
+      oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.16, now + 0.65)
       oscillator.connect(gain)
       oscillator.start(now + index * 0.04)
       oscillator.stop(now + 0.95)
     })
   }
+})()
 
-  const initXrScene = ({scene, camera, renderer}) => {
+export const initScenePipelineModule = () => {
+  const clock = new THREE.Clock()
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+  const raycaster = new THREE.Raycaster()
+  const selectedGroundPoint = new THREE.Vector3(0, 0, -PLACEMENT_DISTANCE_METERS)
+  const dragRight = new THREE.Vector3()
+  const dragForward = new THREE.Vector3()
+  const cameraPortalPosition = new THREE.Vector3()
+  const smoothedCameraPosition = new THREE.Vector3()
+  const vrTourOffset = new THREE.Vector3()
+  let hasSmoothedCameraPosition = false
+  let marker
+  let markerPulse
+  let portal
+  let doorRoot
+  let doorMixer
+  let doorActions = []
+  let doorOpen = false
+  let doorReady = false
+  let portalRaised = false
+  let portalWorld
+  let lumaSplats
+  let glbScene
+  let gltfLoader
+  let agentVideo
+  let isInsidePortal = false
+  let vrTourMode = false
+  let vrMoveDirection = null
+  let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
+
+  const dispatchTrackingStatus = (message = 'Move your phone to choose a ground point, then tap Open Portal.') => {
+    window.dispatchEvent(new CustomEvent('portal-tracking-change', {
+      detail: {canEnter: portalRaised, source: '8th-wall-ground', state: 'stable', message},
+    }))
+  }
+
+  const updatePlacementUi = (state, message) => {
+    window.dispatchEvent(new CustomEvent('portal-placement-change', {detail: {state, message}}))
+  }
+
+  const orientToCameraOnGround = (object, camera) => {
+    const dx = camera.position.x - object.position.x
+    const dz = camera.position.z - object.position.z
+    object.rotation.set(0, Math.atan2(dx, dz), 0)
+  }
+
+  const syncPortalWorld = () => {
+    if (!portalWorld || !portal) return
+    portalWorld.position.copy(portal.position)
+    portalWorld.quaternion.copy(portal.quaternion)
+  }
+
+  const setPlacementPointFromScreen = (screenX = window.innerWidth / 2, screenY = window.innerHeight / 2) => {
+    const {camera} = XR8.Threejs.xrScene()
+    const ndc = new THREE.Vector2((screenX / window.innerWidth) * 2 - 1, -(screenY / window.innerHeight) * 2 + 1)
+    raycaster.setFromCamera(ndc, camera)
+    const hit = new THREE.Vector3()
+    if (!raycaster.ray.intersectPlane(groundPlane, hit) || hit.distanceTo(camera.position) < 0.35) {
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+      forward.y = 0
+      forward.normalize()
+      hit.copy(camera.position).addScaledVector(forward, PLACEMENT_DISTANCE_METERS)
+      hit.y = 0
+    }
+    selectedGroundPoint.copy(hit)
+    if (marker) {
+      marker.position.copy(selectedGroundPoint)
+      orientToCameraOnGround(marker, camera)
+    }
+    updatePlacementUi('ready', 'Ground point selected. Press Open Portal to raise the door here.')
+  }
+
+  const raisePortalAtSelectedPoint = () => {
+    if (!portal || portalRaised) return
+    const {camera} = XR8.Threejs.xrScene()
+    portalRaised = true
+    portal.visible = true
+    portal.position.copy(selectedGroundPoint)
+    portal.userData.revealProgress = 0
+    orientToCameraOnGround(portal, camera)
+    if (marker) marker.visible = false
+    syncPortalWorld()
+    playPortalEntrySound()
+    updatePlacementUi('opened', 'Door portal is placed. Walk closer to open the door.')
+    dispatchTrackingStatus('Door portal placed. Walk closer to open it.')
+  }
+
+  const setDoorOpen = (open) => {
+    if (doorOpen === open || !doorReady) return
+    doorOpen = open
+    doorActions.forEach((action) => {
+      action.paused = false
+      action.enabled = true
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+      action.timeScale = open ? Math.abs(action.timeScale || 1) : -Math.abs(action.timeScale || 1)
+      if (!open) action.time = action.getClip().duration
+      action.play()
+    })
+    window.dispatchEvent(new CustomEvent('portal-door-change', {detail: {open}}))
+  }
+
+  const createPlacementMarker = (scene) => {
+    const group = new THREE.Group()
+    group.name = 'ground-placement-point-ui'
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.32, 0.38, 96),
+      new THREE.MeshBasicMaterial({color: 0x7ce0ff, transparent: true, opacity: 0.9, side: THREE.DoubleSide})
+    )
+    ring.rotation.x = -Math.PI / 2
+    const dot = new THREE.Mesh(
+      new THREE.CircleGeometry(0.075, 40),
+      new THREE.MeshBasicMaterial({color: 0xffd76b, transparent: true, opacity: 0.95, side: THREE.DoubleSide})
+    )
+    dot.rotation.x = -Math.PI / 2
+    markerPulse = ring
+    group.add(ring, dot)
+    scene.add(group)
+    marker = group
+  }
+
+  const createPortal = (scene) => {
+    const group = new THREE.Group()
+    group.name = 'ground-door-portal'
+    group.visible = false
+    group.userData.revealProgress = 0
+    scene.add(group)
+
+    const base = new THREE.Mesh(
+      new THREE.CircleGeometry(0.75, 96),
+      new THREE.MeshStandardMaterial({color: 0x1a2945, roughness: 0.78, metalness: 0.18, transparent: true, opacity: 0.82})
+    )
+    base.rotation.x = -Math.PI / 2
+    base.receiveShadow = true
+    group.add(base)
+
+    gltfLoader.load(doorModelUrl, (gltf) => {
+      doorRoot = gltf.scene
+      doorRoot.name = 'lowpoly-animated-door-portal-model'
+      doorRoot.traverse((child) => {
+        child.castShadow = true
+        child.receiveShadow = true
+      })
+      fitObjectToHeight(doorRoot, DOOR_REAL_WORLD_HEIGHT_METERS)
+      group.add(doorRoot)
+      doorMixer = new THREE.AnimationMixer(doorRoot)
+      doorActions = gltf.animations.map((clip) => doorMixer.clipAction(clip))
+      doorActions.forEach((action) => {
+        action.setLoop(THREE.LoopOnce, 1)
+        action.clampWhenFinished = true
+        action.enabled = true
+        action.time = 0
+        action.paused = true
+        action.play()
+      })
+      doorReady = true
+    })
+
+    agentVideo = new AgentVideo()
+    agentVideo.addToPortal(group)
+
+    const portalLight = new THREE.PointLight(0xffa640, 2.2, 4)
+    portalLight.position.set(0, 1.2, 0.45)
+    group.add(portalLight)
+    portal = group
+  }
+
+  const initXrScene = ({scene, renderer}) => {
     renderer.shadowMap.enabled = true
     renderer.outputColorSpace = THREE.SRGBColorSpace
-
-    const ambientLight = new THREE.HemisphereLight(0xdcecff, 0x161927, 1.15)
-    scene.add(ambientLight)
-
+    scene.add(new THREE.HemisphereLight(0xdcecff, 0x161927, 1.15))
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.85)
     directionalLight.position.set(3, 6, 4)
     directionalLight.castShadow = true
@@ -431,25 +282,13 @@ export const initScenePipelineModule = () => {
     lumaSplats.name = 'editable-gaussian-splat-world'
     applyTransform(lumaSplats, worldConfig.gaussianSplat)
     portalWorld.add(lumaSplats)
-
     lumaSplats.onLoad = () => {
-      lumaSplats.captureCubemap(renderer).then((capturedTexture) => {
-        scene.environment = capturedTexture
-      })
+      lumaSplats.captureCubemap(renderer).then((capturedTexture) => { scene.environment = capturedTexture })
     }
 
     gltfLoader = new GLTFLoader()
-    createHandTrail(scene)
-
-    portal = createPortal()
-    scene.add(portal)
-
-    agentVideo = new AgentVideo()
-    agentVideo.addToPortal(portal)
-
-    const portalLight = new THREE.PointLight(0xffa640, 2.2, 4)
-    portalLight.position.set(0, 0, 0.6)
-    portal.add(portalLight)
+    createPlacementMarker(scene)
+    createPortal(scene)
 
     const planeGeometry = new THREE.PlaneGeometry(2000, 2000)
     planeGeometry.rotateX(-Math.PI / 2)
@@ -460,100 +299,79 @@ export const initScenePipelineModule = () => {
 
   return {
     name: 'threejsinitscene',
-    listeners: [
-      {event: 'handcontroller.handfound', process: addPointFromHandEvent},
-      {event: 'handcontroller.handupdated', process: addPointFromHandEvent},
-      {event: 'handcontroller.handlost', process: showFallbackPrompt},
-    ],
 
     onStart: ({canvas}) => {
-      const {scene, camera, renderer} = XR8.Threejs.xrScene()
+      const {scene, renderer} = XR8.Threejs.xrScene()
+      initXrScene({scene, renderer})
+      window.setTimeout(() => setPlacementPointFromScreen(), 400)
+      dispatchTrackingStatus()
 
-      initXrScene({scene, camera, renderer})
-
-      let pinchStartDistance = 0
-      let pinchStartScale = 1
       let activeTouchMode = 'none'
       let dragLastX = 0
       let dragLastY = 0
       let dragTotalMovement = 0
 
-      const getTouchDistance = (touches) => {
-        const dx = touches[0].clientX - touches[1].clientX
-        const dy = touches[0].clientY - touches[1].clientY
-        return Math.hypot(dx, dy)
-      }
-
       canvas.addEventListener('touchmove', (event) => {
         event.preventDefault()
-
-        if (event.touches.length === 2 && portal && pinchStartDistance > 0) {
-          activeTouchMode = 'pinch'
-          const nextScale = Math.max(
-            MIN_PORTAL_SCALE,
-            pinchStartScale * (getTouchDistance(event.touches) / pinchStartDistance)
-          )
-          portal.userData.baseScale = nextScale
-          portal.scale.setScalar(nextScale)
-          return
-        }
-
-        if (event.touches.length === 1 && portal && activeTouchMode === 'drag' && !isInsidePortal) {
-          const touch = event.touches[0]
-          const deltaX = touch.clientX - dragLastX
-          const deltaY = touch.clientY - dragLastY
-          dragLastX = touch.clientX
-          dragLastY = touch.clientY
-          dragTotalMovement += Math.hypot(deltaX, deltaY)
-
-          const {camera} = XR8.Threejs.xrScene()
-          dragRight.set(1, 0, 0).applyQuaternion(camera.quaternion)
-          dragUp.set(0, 1, 0).applyQuaternion(camera.quaternion)
-          portal.position.addScaledVector(dragRight, deltaX * PORTAL_DRAG_SENSITIVITY)
-          portal.position.addScaledVector(dragUp, -deltaY * PORTAL_DRAG_SENSITIVITY)
-          portal.position.y = Math.max(0.35, portal.position.y)
-          if (portalWorld) portalWorld.position.copy(portal.position)
-        }
+        if (event.touches.length !== 1 || !portalRaised || !portal || isInsidePortal) return
+        activeTouchMode = 'drag'
+        const touch = event.touches[0]
+        const deltaX = touch.clientX - dragLastX
+        const deltaY = touch.clientY - dragLastY
+        dragLastX = touch.clientX
+        dragLastY = touch.clientY
+        dragTotalMovement += Math.hypot(deltaX, deltaY)
+        const {camera} = XR8.Threejs.xrScene()
+        dragRight.set(1, 0, 0).applyQuaternion(camera.quaternion)
+        dragForward.set(0, 0, -1).applyQuaternion(camera.quaternion)
+        dragRight.y = 0
+        dragForward.y = 0
+        dragRight.normalize()
+        dragForward.normalize()
+        portal.position.addScaledVector(dragRight, deltaX * PORTAL_DRAG_SENSITIVITY)
+        portal.position.addScaledVector(dragForward, -deltaY * PORTAL_DRAG_SENSITIVITY)
+        portal.position.y = 0
+        syncPortalWorld()
       }, {passive: false})
 
-      canvas.addEventListener(
-        'touchstart', (event) => {
-          if (event.touches.length === 2) {
-            activeTouchMode = 'pinch'
-            pinchStartDistance = getTouchDistance(event.touches)
-            pinchStartScale = portal.userData.baseScale
-            return
-          }
+      canvas.addEventListener('touchstart', (event) => {
+        if (event.touches.length !== 1) return
+        activeTouchMode = 'drag'
+        dragLastX = event.touches[0].clientX
+        dragLastY = event.touches[0].clientY
+        dragTotalMovement = 0
+      }, true)
 
-          if (event.touches.length === 1) {
-            activeTouchMode = 'drag'
-            dragLastX = event.touches[0].clientX
-            dragLastY = event.touches[0].clientY
-            dragTotalMovement = 0
+      canvas.addEventListener('touchend', (event) => {
+        if (event.touches.length === 0 && activeTouchMode === 'drag' && dragTotalMovement < MAX_TAP_MOVEMENT) {
+          const changed = event.changedTouches?.[0]
+          if (!portalRaised && changed) setPlacementPointFromScreen(changed.clientX, changed.clientY)
+          else if (portal?.visible) {
+            const nextIndex = (portal.userData.destinationIndex || 0) + 1
+            portal.userData.destinationIndex = nextIndex % DESTINATIONS.length
+            window.dispatchEvent(new CustomEvent('portal-destination-change', {detail: DESTINATIONS[portal.userData.destinationIndex]}))
           }
-        }, true
-      )
+        }
+        if (event.touches.length === 0) activeTouchMode = 'none'
+      })
 
-      window.addEventListener('portal-recenter-request', () => { portalUnlockedByGesture = true; if (portal) portal.visible = true; placePortalInFrontOfCamera() })
-      window.addEventListener('portal-hand-point', (event) => addHandTrailPoint(event.detail.x, event.detail.y, event.detail.source))
-      window.addEventListener('handcontroller.handfound', addPointFromHandEvent)
-      window.addEventListener('handcontroller.handupdated', addPointFromHandEvent)
-      window.setTimeout(showFallbackPrompt, 4500)
-      window.addEventListener('portal-dissolve-toggle', () => {
-        dissolveRealWorld = !dissolveRealWorld
-        window.dispatchEvent(new CustomEvent('portal-dissolve-change', {detail: {enabled: dissolveRealWorld}}))
+      window.addEventListener('portal-open-request', raisePortalAtSelectedPoint)
+      window.addEventListener('portal-recenter-request', () => {
+        portalRaised = false
+        if (portal) portal.visible = false
+        if (marker) marker.visible = true
+        setPlacementPointFromScreen()
+        updatePlacementUi('ready', 'Choose a new ground point, then tap Open Portal.')
       })
       window.addEventListener('portal-vr-toggle', (event) => {
         vrTourMode = event.detail?.enabled ?? !vrTourMode
         isInsidePortal = vrTourMode || isInsidePortal
         if (portalWorld) portalWorld.visible = isInsidePortal
-        if (portal) portal.visible = !isInsidePortal
+        if (portal) portal.visible = portalRaised && !isInsidePortal
         window.dispatchEvent(new CustomEvent('portal-vr-change', {detail: {enabled: vrTourMode}}))
         window.dispatchEvent(new CustomEvent('portal-entry-change', {detail: {isInsidePortal}}))
       })
-      window.addEventListener('portal-vr-move', (event) => {
-        vrMoveDirection = event.detail.direction
-      })
+      window.addEventListener('portal-vr-move', (event) => { vrMoveDirection = event.detail.direction })
       window.addEventListener('portal-editor-update', (event) => {
         const {target, transform, url} = event.detail
         if (!worldConfig[target]) return
@@ -573,72 +391,49 @@ export const initScenePipelineModule = () => {
           }
         }
       })
-      dispatchTrackingStatus()
-
-      canvas.addEventListener('touchend', (event) => {
-        if (activeTouchMode === 'drag' && event.touches.length === 0 && dragTotalMovement < MAX_TAP_MOVEMENT) {
-          if (portal.visible) updateDestination(portal)
-        }
-
-        if (event.touches.length === 0) {
-          activeTouchMode = 'none'
-          pinchStartDistance = 0
-        }
-      })
-    },
-
-    onProcessCpu: ({processCpuResult}) => {
-      const tip = readIndexTip(processCpuResult?.hands || processCpuResult?.handDetections || processCpuResult?.handTracking)
-      if (!tip) return
-      const x = tip.x <= 1 ? tip.x * window.innerWidth : tip.x
-      const y = tip.y <= 1 ? tip.y * window.innerHeight : tip.y
-      addHandTrailPoint(x, y, 'hand')
     },
 
     onUpdate: () => {
-      if (!portal) return
-
+      const delta = clock.getDelta()
+      const elapsed = clock.elapsedTime
       const {camera} = XR8.Threejs.xrScene()
-      const elapsed = clock.getElapsedTime()
+      if (marker?.visible) {
+        markerPulse.scale.setScalar(1 + Math.sin(elapsed * 3.8) * 0.16)
+        marker.rotation.y += delta * 0.8
+      }
+      if (!portal) return
       if (!hasSmoothedCameraPosition) {
         smoothedCameraPosition.copy(camera.position)
         hasSmoothedCameraPosition = true
-      } else {
-        smoothedCameraPosition.lerp(camera.position, 0.18)
+      } else smoothedCameraPosition.lerp(camera.position, 0.18)
+
+      if (portalRaised) {
+        portal.userData.revealProgress += (1 - portal.userData.revealProgress) * 0.08
+        portal.position.y = THREE.MathUtils.lerp(-DOOR_REAL_WORLD_HEIGHT_METERS, 0, portal.userData.revealProgress)
+        const distanceToDoor = new THREE.Vector2(camera.position.x - selectedGroundPoint.x, camera.position.z - selectedGroundPoint.z).length()
+        if (!doorOpen && distanceToDoor < DOOR_OPEN_DISTANCE_METERS) setDoorOpen(true)
+        if (doorOpen && distanceToDoor > DOOR_CLOSE_DISTANCE_METERS) setDoorOpen(false)
       }
 
+      if (doorMixer) doorMixer.update(delta)
       portal.worldToLocal(cameraPortalPosition.copy(smoothedCameraPosition))
       const portalPlaneDistance = cameraPortalPosition.z
-      const portalRadialDistance = Math.hypot(cameraPortalPosition.x, cameraPortalPosition.y)
+      const portalRadialDistance = Math.hypot(cameraPortalPosition.x, cameraPortalPosition.y - 1.05)
       const thresholdRadius = isInsidePortal ? PORTAL_EXIT_RADIUS : PORTAL_ENTRY_RADIUS
-      const isWithinPortalOpening = portalRadialDistance < thresholdRadius
-      const isBehindPortal = isInsidePortal
-        ? portalPlaneDistance < PORTAL_ENTRY_DEPTH
-        : portalPlaneDistance < -PORTAL_ENTRY_DEPTH
-      const shouldBeInsidePortal = vrTourMode || (isWithinPortalOpening && isBehindPortal)
+      const shouldBeInsidePortal = portalRaised && (vrTourMode || (portalRadialDistance < thresholdRadius && portalPlaneDistance < -PORTAL_ENTRY_DEPTH))
 
       if (shouldBeInsidePortal !== isInsidePortal) {
         isInsidePortal = shouldBeInsidePortal
         window.dispatchEvent(new CustomEvent('portal-entry-change', {detail: {isInsidePortal}}))
         if (agentVideo) agentVideo.setActive(isInsidePortal)
-        if (isInsidePortal) {
-          portal.visible = false
-          if (portalWorld) {
-            portalWorld.position.copy(portal.position)
-            portalWorld.quaternion.copy(portal.quaternion)
-          }
-          playPortalEntrySound()
-        } else {
-          portal.visible = true
-        }
+        if (isInsidePortal) playPortalEntrySound()
       }
 
+      portal.visible = portalRaised && !isInsidePortal
       if (portalWorld) {
         portalWorld.visible = isInsidePortal
-        if (isInsidePortal) {
-          portalWorld.position.copy(portal.position).add(vrTourOffset)
-          portalWorld.quaternion.copy(portal.quaternion)
-        }
+        if (isInsidePortal) portalWorld.position.copy(selectedGroundPoint).add(vrTourOffset)
+        portalWorld.quaternion.copy(portal.quaternion)
       }
       if (vrTourMode && vrMoveDirection) {
         const speed = 0.035
@@ -647,24 +442,6 @@ export const initScenePipelineModule = () => {
         if (vrMoveDirection === 'left') vrTourOffset.x += speed
         if (vrMoveDirection === 'right') vrTourOffset.x -= speed
       }
-      worldOpacity += ((dissolveRealWorld ? 0.34 : 1) - worldOpacity) * WORLD_DISSOLVE_SPEED
-      if (portalWorld) setObjectOpacity(portalWorld, worldOpacity)
-      portal.userData.revealProgress += ((portalUnlockedByGesture ? 1 : 0) - portal.userData.revealProgress) * 0.08
-      portal.scale.setScalar(portal.userData.baseScale * (isInsidePortal ? 0.001 : Math.max(0.001, portal.userData.revealProgress)))
-      portal.userData.outerRing.material.opacity = isInsidePortal ? 0 : 0.9
-      portal.userData.innerMaterial.opacity = isInsidePortal ? 0 : 0.94
-      portal.userData.outerRing.rotation.z = elapsed * 0.85
-      portal.userData.runeGroup.rotation.z = -elapsed * 0.55
-      portal.userData.innerRing.rotation.z = -elapsed * 1.35
-      const positions = portal.userData.sparks.geometry.attributes.position
-      for (let i = 0; i < portal.userData.sparkAngles.length; i++) {
-        const angle = portal.userData.sparkAngles[i] + elapsed * (0.75 + (i % 7) * 0.04)
-        const radius = portal.userData.sparkRadii[i] + Math.sin(elapsed * 3 + i) * 0.035
-        positions.setXYZ(i, Math.cos(angle) * radius, Math.sin(angle) * radius, Math.sin(elapsed * 4 + i) * 0.12)
-      }
-      positions.needsUpdate = true
-      portal.userData.sparks.rotation.z = elapsed * 0.32
-      portal.userData.innerWorld.scale.setScalar(1 + Math.sin(elapsed * 2.4) * 0.018)
       if (agentVideo) agentVideo.update(camera)
     },
   }

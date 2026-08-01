@@ -487,7 +487,7 @@ body {
   }
 }
 
-.agent-panel__dissolve {
+.agent-panel__open {
   flex: none;
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.22);
@@ -496,7 +496,7 @@ body {
   background: linear-gradient(135deg, #7ce0ff, #f7fbff);
 }
 
-.agent-panel__dissolve[aria-pressed="true"] {
+.agent-panel__open[aria-pressed="true"] {
   background: linear-gradient(135deg, #ffd67e, #ff8f2e);
 }
 
@@ -1038,7 +1038,7 @@ body {
   background: linear-gradient(90deg, #7ce0ff, #ffb04f, #ff5fa2);
 }
 
-.gesture-instruction[data-state='complete'] {
+.gesture-instruction[data-state='opened'] {
   border-color: rgba(255, 176, 79, 0.76);
   box-shadow: 0 0 34px rgba(255, 176, 79, 0.28), inset 0 0 30px rgba(255, 95, 162, 0.14);
 }
