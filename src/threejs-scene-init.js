@@ -15,15 +15,15 @@ const DEFAULT_WORLD_CONFIG = {
   glb: {url: '', position: [0.72, 0, -1.6], rotation: [0, 0, 0], scale: [1, 1, 1]},
 }
 
-const DOOR_REAL_WORLD_HEIGHT_METERS = 6.15
-const DOOR_OPEN_DISTANCE_METERS = 1.35
-const DOOR_CLOSE_DISTANCE_METERS = 1.8
-const PORTAL_ENTRY_RADIUS = 2.7
+const DOOR_REAL_WORLD_HEIGHT_METERS = 5.0
+const DOOR_OPEN_DISTANCE_METERS = 2.0
+const DOOR_CLOSE_DISTANCE_METERS = 2.5
+const PORTAL_ENTRY_RADIUS = 3.5
 const PORTAL_EXIT_RADIUS = 4.05
-const PORTAL_ENTRY_DEPTH = 0.2
+const PORTAL_ENTRY_DEPTH = 0.5
 const PORTAL_DRAG_SENSITIVITY = 0.0038
 const MAX_TAP_MOVEMENT = 10
-const PLACEMENT_DISTANCE_METERS = 4.6
+const PLACEMENT_DISTANCE_METERS = 3.6
 
 const applyTransform = (object, transform = {}) => {
   if (!object) return
