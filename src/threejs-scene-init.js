@@ -391,7 +391,7 @@ export const initScenePipelineModule = () => {
         if (isInsidePortal) playPortalEntrySound()
       }
 
-      portal.visible = portalRaised && !isInsidePortal
+      portal.visible = portalRaised 
       if (portalWorld) {
         portalWorld.visible = isInsidePortal
         portalWorld.position.copy(selectedGroundPoint)
