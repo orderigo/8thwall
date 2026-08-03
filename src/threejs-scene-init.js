@@ -4,25 +4,6 @@ import * as THREE from 'three'
 import {LumaSplatsThree} from '@lumaai/luma-web'
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js'
 import doorModelUrl from './assets/lowpoly_animated_doors_blender_file.glb?url'
-import {AgentVideo} from './agentvideo'
-
-const DESTINATIONS = [
-  {
-    name: 'Bagan, Myanmar',
-    color: 0xff9d2e,
-    facts: ['Ancient temples', 'Golden-hour balloon flights', 'Irrawaddy River plains'],
-  },
-  {
-    name: 'Kyoto, Japan',
-    color: 0xff5fa2,
-    facts: ['Torii gates', 'Zen gardens', 'Seasonal cherry blossoms'],
-  },
-  {
-    name: 'Machu Picchu, Peru',
-    color: 0x4ddf83,
-    facts: ['Andes viewpoint', 'Inca stonework', 'Cloud-forest trails'],
-  },
-]
 
 const DEFAULT_WORLD_CONFIG = {
   gaussianSplat: {
@@ -102,7 +83,6 @@ export const initScenePipelineModule = () => {
   const dragForward = new THREE.Vector3()
   const cameraPortalPosition = new THREE.Vector3()
   const smoothedCameraPosition = new THREE.Vector3()
-  const vrTourOffset = new THREE.Vector3()
   let hasSmoothedCameraPosition = false
   let marker
   let markerPulse
@@ -117,10 +97,7 @@ export const initScenePipelineModule = () => {
   let lumaSplats
   let glbScene
   let gltfLoader
-  let agentVideo
   let isInsidePortal = false
-  let vrTourMode = false
-  let vrMoveDirection = null
   let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
 
   const dispatchTrackingStatus = (message = 'Move your phone to choose a ground point, then tap Open Portal.') => {
@@ -251,8 +228,7 @@ export const initScenePipelineModule = () => {
       doorReady = true
     })
 
-    agentVideo = new AgentVideo()
-    agentVideo.addToPortal(group)
+
 
     const portalLight = new THREE.PointLight(0xffa640, 2.2, 4)
     portalLight.position.set(0, 1.2, 0.45)
@@ -346,11 +322,6 @@ export const initScenePipelineModule = () => {
         if (event.touches.length === 0 && activeTouchMode === 'drag' && dragTotalMovement < MAX_TAP_MOVEMENT) {
           const changed = event.changedTouches?.[0]
           if (!portalRaised && changed) setPlacementPointFromScreen(changed.clientX, changed.clientY)
-          else if (portal?.visible) {
-            const nextIndex = (portal.userData.destinationIndex || 0) + 1
-            portal.userData.destinationIndex = nextIndex % DESTINATIONS.length
-            window.dispatchEvent(new CustomEvent('portal-destination-change', {detail: DESTINATIONS[portal.userData.destinationIndex]}))
-          }
         }
         if (event.touches.length === 0) activeTouchMode = 'none'
       })
@@ -363,15 +334,7 @@ export const initScenePipelineModule = () => {
         setPlacementPointFromScreen()
         updatePlacementUi('ready', 'Choose a new ground point, then tap Open Portal.')
       })
-      window.addEventListener('portal-vr-toggle', (event) => {
-        vrTourMode = event.detail?.enabled ?? !vrTourMode
-        isInsidePortal = vrTourMode || isInsidePortal
-        if (portalWorld) portalWorld.visible = isInsidePortal
-        if (portal) portal.visible = portalRaised && !isInsidePortal
-        window.dispatchEvent(new CustomEvent('portal-vr-change', {detail: {enabled: vrTourMode}}))
-        window.dispatchEvent(new CustomEvent('portal-entry-change', {detail: {isInsidePortal}}))
-      })
-      window.addEventListener('portal-vr-move', (event) => { vrMoveDirection = event.detail.direction })
+
       window.addEventListener('portal-editor-update', (event) => {
         const {target, transform, url} = event.detail
         if (!worldConfig[target]) return
@@ -420,29 +383,20 @@ export const initScenePipelineModule = () => {
       const portalPlaneDistance = cameraPortalPosition.z
       const portalRadialDistance = Math.hypot(cameraPortalPosition.x, cameraPortalPosition.y - 1.05)
       const thresholdRadius = isInsidePortal ? PORTAL_EXIT_RADIUS : PORTAL_ENTRY_RADIUS
-      const shouldBeInsidePortal = portalRaised && (vrTourMode || (portalRadialDistance < thresholdRadius && portalPlaneDistance < -PORTAL_ENTRY_DEPTH))
+      const shouldBeInsidePortal = portalRaised && (portalRadialDistance < thresholdRadius && portalPlaneDistance < -PORTAL_ENTRY_DEPTH)
 
       if (shouldBeInsidePortal !== isInsidePortal) {
         isInsidePortal = shouldBeInsidePortal
         window.dispatchEvent(new CustomEvent('portal-entry-change', {detail: {isInsidePortal}}))
-        if (agentVideo) agentVideo.setActive(isInsidePortal)
         if (isInsidePortal) playPortalEntrySound()
       }
 
       portal.visible = portalRaised && !isInsidePortal
       if (portalWorld) {
         portalWorld.visible = isInsidePortal
-        if (isInsidePortal) portalWorld.position.copy(selectedGroundPoint).add(vrTourOffset)
+        portalWorld.position.copy(selectedGroundPoint)
         portalWorld.quaternion.copy(portal.quaternion)
       }
-      if (vrTourMode && vrMoveDirection) {
-        const speed = 0.035
-        if (vrMoveDirection === 'forward') vrTourOffset.z += speed
-        if (vrMoveDirection === 'back') vrTourOffset.z -= speed
-        if (vrMoveDirection === 'left') vrTourOffset.x += speed
-        if (vrMoveDirection === 'right') vrTourOffset.x -= speed
-      }
-      if (agentVideo) agentVideo.update(camera)
     },
   }
 }

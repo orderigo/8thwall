@@ -1,6 +1,6 @@
-# 8th Wall Magic Portal Travel Guide
+# 8th Wall Magic Portal
 
-This project uses 8th Wall SLAM tracking with three.js to pin a Dr. Strange-inspired magic portal into the real world. The first prototype lets a visitor tap the portal to rotate through world destinations and ask a lightweight Portal LLM Agent mock UI for guidance.
+This project uses 8th Wall SLAM tracking with three.js to pin a Dr. Strange-inspired magic portal into the real world. Users can place the portal on the ground and walk through it to experience an immersive 3D world.
 
 ![Virtual cube aligned to the floor of a room](./public/preview.jpg)
 
@@ -8,38 +8,27 @@ This project uses 8th Wall SLAM tracking with three.js to pin a Dr. Strange-insp
 
 ### Vision
 
-Create an AR learning experience where users open magic portals to places around the world, step closer, and ask an embedded LLM Agent about history, culture, travel tips, and visual landmarks.
+Create an AR experience where users can place and interact with a magical portal in their real-world environment.
 
 ### Experience Flow
 
 1. **SLAM placement** - 8th Wall world tracking anchors the portal in front of the user.
-2. **Magic portal reveal** - Animated rings, runes, sparks, and a destination window make the space feel like a magical doorway.
-3. **Destination browsing** - Tapping the canvas recenters the AR scene and cycles the first destinations: Bagan, Kyoto, and Machu Picchu.
-4. **LLM Agent overlay** - A bottom panel shows the current destination and accepts user questions.
-5. **Contextual answers** - Next milestone is to send questions, destination metadata, and safety instructions to a hosted LLM endpoint.
-
-### LLM Agent Design
-
-- **Role**: Friendly travel-learning guide inside the portal.
-- **Inputs**: User question, selected destination, detected language, session age, and optional coordinates/content pack.
-- **Outputs**: Concise explanations, suggested things to notice, cultural etiquette, accessibility notes, and source-backed facts.
-- **Safety**: Refuse unsafe travel advice, avoid hallucinated live details, cite sources for historical claims, and clearly separate prototype content from live travel guidance.
-- **Future tools**: Retrieval over curated destination packs, translation, text-to-speech, image recognition, and itinerary builder.
+2. **Magic portal reveal** - Animated door opens as the user approaches.
+3. **Portal entry** - Walking through the portal threshold transports the user into a 3D world.
 
 ### Milestones
 
-- **MVP 1 - First Portal**: Build a SLAM-anchored animated portal with destination preview cards and an agent chat mock.
-- **MVP 2 - Real Agent**: Add a backend API route for LLM calls with destination context and moderation.
-- **MVP 3 - Content Packs**: Add structured destination JSON with images, narrated facts, and quiz prompts.
-- **MVP 4 - Spatial Interaction**: Add raycasting hotspots inside the portal and hand/tap interactions.
-- **MVP 5 - Multi-Portal Map**: Let users summon portals by region, theme, or learning objective.
+- **MVP 1 - Portal Placement**: Build a SLAM-anchored animated portal with ground placement.
+- **MVP 2 - World Entry**: Enable walking through the portal to enter a 3D world.
+- **MVP 3 - World Customization**: Add ability to customize the portal world content.
+- **MVP 4 - Spatial Interaction**: Add raycasting and hand/tap interactions.
 
 ## Current Prototype
 
-- Animated portal ring, rune marks, particles, and glowing destination window are created in `src/threejs-scene-init.js`.
-- The Portal LLM Agent UI is created in `src/app.js` and styled in `src/index.css`.
-- Tap the AR canvas to recenter tracking and cycle to the next destination.
-- Walk through the portal threshold with the phone to fade into the 360 destination room.
+- Animated door portal is created in `src/threejs-scene-init.js`.
+- The Portal UI is created in `src/app.js` and styled in `src/index.css`.
+- Tap the AR canvas to select a ground point and place the portal.
+- Walk through the portal threshold with the phone to enter the 3D world.
 
 
 ## Portal Entry Technology Recommendation
@@ -66,13 +55,13 @@ Traditional point clouds can look sparse on mobile and often need custom shaders
 
 ### Walk-through Behavior Implemented
 
-The prototype now detects when the phone camera gets close to the portal. When the user physically walks forward through the portal threshold, the app fades in a procedural 360 destination room around the camera. When the user walks back out, the 360 room fades away and the AR portal remains anchored in the real world.
+The prototype now detects when the phone camera gets close to the portal. When the user physically walks forward through the portal threshold, the app shows the 3D world content. When the user walks back out, the 3D world hides and the AR portal remains anchored in the real world.
 
 ### SLAM + Computer Vision Portal Stability
 
-Yes, the portal combines 8th Wall world tracking with a production-oriented tracking confidence guard so visitors can physically walk into the portal without letting a low-confidence pose trigger a bad transition. The app samples camera pose motion over a rolling window, scores motion jitter and speed, debounces tracking-state changes, and exposes stable, recovering, or limited states to the guide overlay.
+The portal combines 8th Wall world tracking with a production-oriented tracking confidence guard so visitors can physically walk into the portal without letting a low-confidence pose trigger a bad transition. The app samples camera pose motion over a rolling window, scores motion jitter and speed, debounces tracking-state changes, and exposes stable, recovering, or limited states.
 
-When tracking confidence drops, the portal gives the visitor recovery guidance, gently pulses the doorway, dims portal content to signal caution, and blocks entry while tracking is limited. In recovering mode, the entry radius becomes slightly more forgiving, but full portal entry still requires the visitor to slow down. A recenter control lets the visitor place the portal back in front of the camera after relocation or drift.
+When tracking confidence drops, the portal gives the visitor recovery guidance and blocks entry while tracking is limited. A recenter control lets the visitor place the portal back in front of the camera after relocation or drift.
 
 Production hardening checklist:
 
