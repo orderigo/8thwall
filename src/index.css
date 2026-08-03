@@ -649,6 +649,43 @@ body {
   box-shadow: 0 0 34px rgba(255, 176, 79, 0.28), inset 0 0 30px rgba(255, 95, 162, 0.14);
 }
 
+/* Babylon.js specific styles */
+#camerafeed {
+  cursor: default;
+}
+
+.info-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 300px;
+  z-index: 1000;
+}
+
+.info-popup p {
+  margin: 0 0 15px;
+  line-height: 1.5;
+}
+
+.info-popup button {
+  background: #0066cc;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.info-popup button:hover {
+  background: #0052a3;
+}
+
 .admin-panel[hidden] {
   display: none;
 }

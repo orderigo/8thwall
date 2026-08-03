@@ -1,9 +1,6 @@
-// app.js is the main entry point for the SLAM-tracked Magic Portal app.
+// app-babylon.js - Main entry point for the SLAM-tracked Magic Portal app using Babylon.js
 
-import {initScenePipelineModule} from './threejs-scene-init'
-import * as THREE from 'three'
-
-window.THREE = THREE
+import { BabylonjsPipelineModule } from './xr8-babylonjs-pipeline'
 
 const PORTAL_EDITOR_PIN = import.meta.env.VITE_PORTAL_EDITOR_PIN || 'portal-admin'
 const PORTAL_EDITOR_UNLOCK_KEY = 'portal-editor-unlocked'
@@ -35,7 +32,7 @@ const emitEditorUpdate = (extra = {}) => {
       target: editorState.target,
       transform: {
         position: transform.position,
-        rotation: transform.rotation.map(THREE.MathUtils.degToRad),
+        rotation: transform.rotation,
         scale: transform.scale,
       },
       ...extra,
@@ -137,12 +134,17 @@ const buildHomePage = ({onExplore}) => {
         <div class="hero-card__content">
           <p class="hero-card__eyebrow">Immersive portal experience</p>
           <h1 id="hero-title">Step into portal worlds from your browser.</h1>
-          <p class="hero-card__copy">Launch an interactive AR portal for camera-based exploration.</p>
+          <p class="hero-card__copy">Launch an interactive AR portal for camera-based exploration with Babylon.js.</p>
           <div class="hero-card__actions">
             <button class="hero-card__button" type="button" data-action="explore">Launch AR Portal</button>
           </div>
         </div>
-        <div class="portal-preview" aria-hidden="true"><div class="portal-preview__ring"></div><div class="portal-preview__core"><span>AR<br>Portal</span></div><div class="portal-preview__orbit portal-preview__orbit--one"></div><div class="portal-preview__orbit portal-preview__orbit--two"></div></div>
+        <div class="portal-preview" aria-hidden="true">
+          <div class="portal-preview__ring"></div>
+          <div class="portal-preview__core"><span>Babylon<br>Portal</span></div>
+          <div class="portal-preview__orbit portal-preview__orbit--one"></div>
+          <div class="portal-preview__orbit portal-preview__orbit--two"></div>
+        </div>
       </section>
     </div>
   `
@@ -155,8 +157,12 @@ const buildHomePage = ({onExplore}) => {
     }, 420)
   }
 
-  home.querySelectorAll('[data-action="explore"]').forEach((button) => button.addEventListener('click', launchAr))
-  home.querySelector('[data-action="admin-login"]').addEventListener('click', () => document.body.dispatchEvent(new CustomEvent('portal-open-admin-login')))
+  home.querySelectorAll('[data-action="explore"]').forEach((button) => 
+    button.addEventListener('click', launchAr)
+  )
+  home.querySelector('[data-action="admin-login"]').addEventListener('click', () => 
+    document.body.dispatchEvent(new CustomEvent('portal-open-admin-login'))
+  )
   document.body.prepend(home)
 }
 
@@ -177,7 +183,11 @@ const buildAdminPanel = () => {
         <p class="auth-form__status" role="status"></p>
       </form>
       <div class="admin-panel__content" hidden>
-        <div class="admin-panel__toolbar"><button type="button" data-admin="load">Load users</button><button type="button" data-admin="demo">Add demo user</button><button type="button" data-admin="logout">Logout</button></div>
+        <div class="admin-panel__toolbar">
+          <button type="button" data-admin="load">Load users</button>
+          <button type="button" data-admin="demo">Add demo user</button>
+          <button type="button" data-admin="logout">Logout</button>
+        </div>
         <div class="admin-panel__users" role="status"></div>
         <p class="admin-panel__note">Dashboard access requires an authenticated admin session. For production user operations, expose secure server-side endpoints or Supabase Edge Functions with role checks.</p>
       </div>
@@ -258,7 +268,7 @@ const buildPortalOverlay = () => {
       <span class="portal-panel__status"></span>
       <div>
         <p class="portal-panel__eyebrow">Portal Controls</p>
-        <h1>Door Portal</h1>
+        <h1>Babylon.js Door Portal</h1>
       </div>
     </div>
     <div class="portal-panel__tracking">
@@ -280,7 +290,7 @@ const buildPortalOverlay = () => {
       </form>
     </section>
     <details class="portal-editor" hidden>
-      <summary>three.js Portal World Editor</summary>
+      <summary>Babylon.js Portal World Editor</summary>
       <label>Asset <select class="portal-editor__target">
         ${Object.entries(EDITOR_TARGETS).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}
       </select></label>
@@ -291,7 +301,11 @@ const buildPortalOverlay = () => {
             <input type="number" step="0.01" data-kind="${kind}" data-axis="${index}" value="${editorState.transforms.gaussianSplat[kind][index]}">
           </label>`).join('')).join('')}
       </div>
-      <div class="portal-editor__actions"><button type="button" class="portal-editor__save">Save backend world</button><button type="button" class="portal-editor__load">Load backend world</button></div><p>Position, rotation, and scale are applied live so Gaussian splats and GLB files can be placed precisely inside the portal.</p>
+      <div class="portal-editor__actions">
+        <button type="button" class="portal-editor__save">Save backend world</button>
+        <button type="button" class="portal-editor__load">Load backend world</button>
+      </div>
+      <p>Position, rotation, and scale are applied live so Gaussian splats and GLB files can be placed precisely inside the portal.</p>
     </details>
   `
   document.body.appendChild(panel)
@@ -407,34 +421,221 @@ const buildPortalOverlay = () => {
   })
 
   window.addEventListener('portal-entry-change', (event) => {
-    const status = event.detail.isInsidePortal ? 'Inside editable portal world' : 'Door Portal threshold'
+    const status = event.detail.isInsidePortal ? 'Inside Babylon.js portal world' : 'Door Portal threshold'
     panel.dataset.portalState = event.detail.isInsidePortal ? 'inside' : 'outside'
     panel.querySelector('h1').textContent = status
   })
 }
+
 
 const startOriginalPortal = () => {
   if (!window.XR8) {
     window.alert('AR Portal is still loading. Please try again in a moment.')
     return
   }
+  
   buildPortalOverlay()
   document.body.classList.add('original-portal-active')
 
+  // Create the Babylon.js pipeline module
+  const babylonjsModule = BabylonjsPipelineModule()
+
   XR8.addCameraPipelineModules([
     XR8.GlTextureRenderer.pipelineModule(),
-    XR8.Threejs.pipelineModule(),
+    XR8.Threejs.pipelineModule(), // Keep for 8th Wall's internal use
     XR8.XrController.pipelineModule(),
     LandingPage.pipelineModule(),
     XRExtras.FullWindowCanvas.pipelineModule(),
     XRExtras.Loading.pipelineModule(),
     XRExtras.RuntimeError.pipelineModule(),
-    initScenePipelineModule(),
+    babylonjsModule // Our custom Babylon.js module
   ])
 
   const canvas = document.getElementById('camerafeed')
-  XR8.run({canvas})
+  XR8.run({ canvas })
+  
+  // Listen for Babylon.js ready event
+  window.addEventListener('babylonjs-ready', (event) => {
+    const { engine, scene, camera } = event.detail
+    console.log('Babylon.js is ready!', { engine, scene, camera })
+    
+    // Add interactivity
+    addInteractivity(scene, camera, babylonjsModule)
+  })
+  
+  // Listen for portal events
+  window.addEventListener('portal-open-request', () => {
+    babylonjsModule.raisePortal()
+  })
+  
+  window.addEventListener('portal-recenter-request', () => {
+    babylonjsModule.recenterPortal()
+  })
 }
+
+
+/**
+ * Add interactivity to the Babylon.js scene
+ */
+const addInteractivity = (scene, camera, babylonModule) => {
+  const canvas = document.getElementById('camerafeed')
+  let lastPickedMesh = null
+  
+  // Add raycasting for mouse/touch
+  const onPointerMove = (event) => {
+    if (!scene || !camera) return
+    
+    // Get pointer position
+    const rect = canvas.getBoundingClientRect()
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    
+    // Create ray
+    const ray = new BABYLON.Ray(
+      new BABYLON.Vector3(x, y, 0),
+      new BABYLON.Vector3(0, 0, -1)
+    )
+    
+    // Transform ray to world space
+    const rayWorld = ray.transformCoordinates(camera.getTransformationMatrix())
+    
+    // Raycast
+    const pickResult = scene.pickWithRay(rayWorld)
+    
+    if (pickResult.hit) {
+      const mesh = pickResult.pickedMesh
+      
+      // Highlight mesh
+      if (lastPickedMesh && lastPickedMesh !== mesh) {
+        if (lastPickedMesh.material) {
+          lastPickedMesh.material.emissiveColor = BABYLON.Color3.Black()
+        }
+      }
+      
+      if (mesh.material) {
+        mesh.material.emissiveColor = new BABYLON.Color3(1, 0, 0)
+      }
+      lastPickedMesh = mesh
+      
+      // Change cursor
+      canvas.style.cursor = 'pointer'
+    } else {
+      if (lastPickedMesh && lastPickedMesh.material) {
+        lastPickedMesh.material.emissiveColor = BABYLON.Color3.Black()
+      }
+      lastPickedMesh = null
+      canvas.style.cursor = 'default'
+    }
+  }
+  
+  const onPointerDown = (event) => {
+    if (!scene || !camera) return
+    
+    // Get pointer position
+    const rect = canvas.getBoundingClientRect()
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    
+    // Create ray
+    const ray = new BABYLON.Ray(
+      new BABYLON.Vector3(x, y, 0),
+      new BABYLON.Vector3(0, 0, -1)
+    )
+    
+    // Transform ray to world space
+    const rayWorld = ray.transformCoordinates(camera.getTransformationMatrix())
+    
+    // Raycast
+    const pickResult = scene.pickWithRay(rayWorld)
+    
+    if (pickResult.hit) {
+      const mesh = pickResult.pickedMesh
+      handleObjectClick(mesh, scene)
+    }
+  }
+  
+  // Add event listeners
+  canvas.addEventListener('mousemove', onPointerMove, false)
+  canvas.addEventListener('click', onPointerDown, false)
+  canvas.addEventListener('touchmove', (event) => {
+    event.preventDefault()
+    onPointerMove(event.touches[0])
+  }, false)
+  canvas.addEventListener('touchstart', (event) => {
+    event.preventDefault()
+    onPointerDown(event.touches[0])
+  }, false)
+  
+  // Add info popup
+  window.showInfoPopup = (text) => {
+    let popup = document.querySelector('.info-popup')
+    if (!popup) {
+      popup = document.createElement('div')
+      popup.className = 'info-popup'
+      popup.innerHTML = `
+        <p></p>
+        <button onclick="this.parentElement.remove()">Close</button>
+      `
+      popup.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.85);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        max-width: 300px;
+        z-index: 1000;
+      `
+      popup.querySelector('button').style.cssText = `
+        background: #0066cc;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 10px;
+      `
+      document.body.appendChild(popup)
+    }
+    popup.querySelector('p').textContent = text
+  }
+}
+
+
+/**
+ * Handle object clicks
+ */
+const handleObjectClick = (mesh, scene) => {
+  console.log('Clicked on:', mesh.name)
+  
+  // Check if mesh has userData with info
+  if (mesh.userData && mesh.userData.info) {
+    window.showInfoPopup(mesh.userData.info)
+    return
+  }
+  
+  // Default behavior based on mesh name
+  switch(mesh.name) {
+    case 'portal-base':
+    case 'portal-door':
+      window.showInfoPopup('This is the magic portal! Walk through to enter.')
+      break
+    case 'sample-box':
+      window.showInfoPopup('This is a sample box inside the portal world.')
+      break
+    case 'sample-sphere':
+      window.showInfoPopup('This is a sample sphere.')
+      break
+    case 'sample-cylinder':
+      window.showInfoPopup('This is a sample cylinder.')
+      break
+    default:
+      window.showInfoPopup(`You clicked on: ${mesh.name}`)
+  }
+}
+
 
 const initializeApp = () => {
   buildAdminPanel()

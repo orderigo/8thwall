@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     
-    <title>AR World Portal Explorer</title>
+    <title>AR World Portal Explorer - Babylon.js</title>
     <meta itemprop="name" content="AR World Portal Explorer">
     <meta name="twitter:title" content="AR World Portal Explorer">
     <meta property="og:title" content="AR World Portal Explorer">
@@ -15,15 +15,28 @@
     <meta name="twitter:description" content="High-tech magical AR portal landing page that opens the Original Portal View for global exploration">
     <meta property="og:image" content="/preview.jpg"/>
 
-    <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+    <!-- 8th Wall Engine - Required for SLAM tracking -->
+    <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" crossorigin="anonymous" data-preload-chunks="slam"></script>
     <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
+
+    <!-- Three.js - Required for 8th Wall's internal use -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- Babylon.js - Our 3D engine -->
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+    <script src="https://cdn.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
 
     <link rel="stylesheet" href="src/index.css">
   </head>
   <body>
     <!-- The main canvas used for drawing by the app. -->
     <canvas id="camerafeed"></canvas>
-    <script type="module" src="src/app.js"></script>
+    
+    <!-- Load app with Babylon.js pipeline -->
+    <script type="module" src="src/app-babylon.js"></script>
   </body>
 </html>
