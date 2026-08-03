@@ -120,13 +120,8 @@ const loadWorldConfig = async () => {
   }
 }
 
-const destinationResponses = {
-  'Bagan, Myanmar': 'Bagan portal is ready. Ask about temple history, sunrise routes, or responsible travel etiquette.',
-  'Kyoto, Japan': 'Kyoto portal is ready. Ask about shrines, seasonal walking paths, tea culture, or local manners.',
-  'Machu Picchu, Peru': 'Machu Picchu portal is ready. Ask about Inca engineering, altitude prep, or trail planning.',
-}
 
-const buildHomePage = ({onExplore, onVrWorld}) => {
+const buildHomePage = ({onExplore}) => {
   const home = document.createElement('main')
   home.className = 'home-page home-page--redesigned'
   home.innerHTML = `
@@ -134,28 +129,20 @@ const buildHomePage = ({onExplore, onVrWorld}) => {
       <nav class="home-nav" aria-label="Main navigation">
         <a class="home-nav__brand" href="#top" aria-label="Portal World home">Portal World</a>
         <div class="home-nav__links">
-          <a href="#destinations">Destinations</a>
           <button type="button" data-action="explore">AR Portal</button>
-          <button type="button" data-action="vr">VR World</button>
           <button type="button" data-action="admin-login">Admin Login</button>
         </div>
       </nav>
       <section class="hero-card" id="top" aria-labelledby="hero-title">
         <div class="hero-card__content">
-          <p class="hero-card__eyebrow">Immersive travel preview</p>
-          <h1 id="hero-title">Step into curated portal worlds from your browser.</h1>
-          <p class="hero-card__copy">Choose an interactive AR portal for camera-based exploration, or open the standalone VR world when you want a full-screen virtual destination without 8th Wall tracking.</p>
+          <p class="hero-card__eyebrow">Immersive portal experience</p>
+          <h1 id="hero-title">Step into portal worlds from your browser.</h1>
+          <p class="hero-card__copy">Launch an interactive AR portal for camera-based exploration.</p>
           <div class="hero-card__actions">
             <button class="hero-card__button" type="button" data-action="explore">Launch AR Portal</button>
-            <button class="hero-card__button hero-card__button--ghost" type="button" data-action="vr">Enter VR World</button>
           </div>
         </div>
-        <div class="portal-preview" aria-hidden="true"><div class="portal-preview__ring"></div><div class="portal-preview__core"><span>VR<br>World</span></div><div class="portal-preview__orbit portal-preview__orbit--one"></div><div class="portal-preview__orbit portal-preview__orbit--two"></div></div>
-      </section>
-      <section class="destination-strip" id="destinations" aria-label="Available destinations">
-        <article><strong>Bagan</strong><span>Temple horizons and sunrise storytelling.</span></article>
-        <article><strong>Kyoto</strong><span>Seasonal paths, shrines, and tea culture.</span></article>
-        <article><strong>Machu Picchu</strong><span>Inca engineering and mountain views.</span></article>
+        <div class="portal-preview" aria-hidden="true"><div class="portal-preview__ring"></div><div class="portal-preview__core"><span>AR<br>Portal</span></div><div class="portal-preview__orbit portal-preview__orbit--one"></div><div class="portal-preview__orbit portal-preview__orbit--two"></div></div>
       </section>
     </div>
   `
@@ -169,7 +156,6 @@ const buildHomePage = ({onExplore, onVrWorld}) => {
   }
 
   home.querySelectorAll('[data-action="explore"]').forEach((button) => button.addEventListener('click', launchAr))
-  home.querySelectorAll('[data-action="vr"]').forEach((button) => button.addEventListener('click', onVrWorld))
   home.querySelector('[data-action="admin-login"]').addEventListener('click', () => document.body.dispatchEvent(new CustomEvent('portal-open-admin-login')))
   document.body.prepend(home)
 }
@@ -181,7 +167,7 @@ const buildAdminPanel = () => {
   panel.hidden = true
   panel.innerHTML = `
     <div class="admin-panel__dialog" role="dialog" aria-modal="true" aria-labelledby="admin-title">
-      <button class="admin-panel__close" type="button" aria-label="Close admin panel">×</button>
+      <button class="admin-panel__close" type="button" aria-label="Close admin panel">\u00d7</button>
       <p class="hero-card__eyebrow">Admin Dashboard</p>
       <h2 id="admin-title">Portal operations</h2>
       <form class="admin-login-form">
@@ -263,75 +249,27 @@ const buildAdminPanel = () => {
   })
 }
 
-const buildStandaloneVrWorld = () => {
-  if (document.querySelector('.standalone-vr')) return
-  const world = document.createElement('section')
-  world.className = 'standalone-vr'
-  world.innerHTML = `
-    <div class="standalone-vr__sky"><span></span><span></span><span></span></div>
-    <div class="standalone-vr__hud"><p>Standalone VR World</p><h2>Bagan sunset portal</h2><span>No 8th Wall tracking required.</span></div>
-    <div class="standalone-vr__controls"><button data-move="up">▲</button><div><button data-move="left">◀</button><button data-move="down">▼</button><button data-move="right">▶</button></div><button data-close-vr>Exit VR World</button></div>
-  `
-  document.body.appendChild(world)
-  let x = 0
-  let y = 0
-  const render = () => {
-    world.style.setProperty('--vr-pan-x', `${x}px`)
-    world.style.setProperty('--vr-pan-y', `${y}px`)
-  }
-  world.addEventListener('click', (event) => {
-    const move = event.target.dataset.move
-    if (event.target.dataset.closeVr !== undefined) { world.remove(); return }
-    if (!move) return
-    if (move === 'left') x -= 36
-    if (move === 'right') x += 36
-    if (move === 'up') y -= 24
-    if (move === 'down') y += 24
-    render()
-  })
-  render()
-}
 
-
-const buildVrControls = () => {
-  const controls = document.createElement('section')
-  controls.className = 'vr-controls'
-  controls.hidden = true
-  controls.innerHTML = `<button data-vr="forward">▲</button><div><button data-vr="left">◀</button><button data-vr="back">▼</button><button data-vr="right">▶</button></div><button data-vr-toggle type="button">Exit VR Tour</button>`
-  document.body.appendChild(controls)
-  let active = null
-  const send = () => window.dispatchEvent(new CustomEvent('portal-vr-move', {detail: {direction: active}}))
-  controls.addEventListener('pointerdown', (event) => { if (event.target.dataset.vr) { active = event.target.dataset.vr; send() } })
-  controls.addEventListener('pointerup', () => { active = null; send() })
-  controls.querySelector('[data-vr-toggle]').addEventListener('click', () => window.dispatchEvent(new CustomEvent('portal-vr-toggle', {detail: {enabled: false}})))
-  window.addEventListener('portal-vr-change', (event) => { controls.hidden = !event.detail.enabled })
-}
-
-const buildAgentOverlay = () => {
+const buildPortalOverlay = () => {
   const panel = document.createElement('section')
-  panel.className = 'agent-panel'
+  panel.className = 'portal-panel'
   panel.innerHTML = `
-    <button class="agent-panel__minimize" type="button" aria-expanded="true" aria-label="Minimize agent chat">Minimize</button>
-    <div class="agent-panel__header">
-      <span class="agent-panel__status"></span>
+    <div class="portal-panel__header">
+      <span class="portal-panel__status"></span>
       <div>
-        <p class="agent-panel__eyebrow">Original Portal LLM Agent</p>
-        <h1>Ask the guide</h1>
+        <p class="portal-panel__eyebrow">Portal Controls</p>
+        <h1>Door Portal</h1>
       </div>
     </div>
-    <p class="agent-panel__destination">Destination: <strong>Bagan, Myanmar</strong></p>
-    <div class="agent-panel__tracking">
-      <p>8th Wall Ground Tracking: <strong>Stable</strong> <span>— choose a ground point</span></p>
-      <button class="agent-panel__recenter" type="button">Choose ground point</button>
-      <button class="agent-panel__open" type="button">Open Portal</button>
+    <div class="portal-panel__tracking">
+      <p>8th Wall Ground Tracking: <strong>Stable</strong> <span>\u2014 choose a ground point</span></p>
+      <button class="portal-panel__recenter" type="button">Choose ground point</button>
+      <button class="portal-panel__open" type="button">Open Portal</button>
     </div>
     <div class="gesture-instruction" aria-live="polite">
-      <strong>Ground tracking point ကိုရွေးပါ</strong>
+      <strong>Ground tracking point</strong>
       <span>Move your phone, tap the animated ground point position, then press Open Portal.</span>
       <meter min="0" max="1" value="1"></meter>
-    </div>
-    <div class="agent-panel__log" aria-live="polite">
-      <p><strong>Agent:</strong> Welcome to the Door Portal. Select the animated ground tracking point, press Open Portal, and walk closer so the door opens for you.</p>
     </div>
     <section class="portal-editor-access" aria-label="Portal editor access">
       <button class="portal-editor-access__toggle" type="button" aria-expanded="false">Editor access</button>
@@ -355,34 +293,18 @@ const buildAgentOverlay = () => {
       </div>
       <div class="portal-editor__actions"><button type="button" class="portal-editor__save">Save backend world</button><button type="button" class="portal-editor__load">Load backend world</button></div><p>Position, rotation, and scale are applied live so Gaussian splats and GLB files can be placed precisely inside the portal.</p>
     </details>
-    <form class="agent-panel__form">
-      <input aria-label="Ask the portal guide" placeholder="e.g. What should I notice here?" />
-      <button type="submit">Ask</button>
-    </form>
   `
   document.body.appendChild(panel)
 
-  const minimizeButton = panel.querySelector('.agent-panel__minimize')
-  const destination = panel.querySelector('.agent-panel__destination strong')
-  const log = panel.querySelector('.agent-panel__log')
-  const tracking = panel.querySelector('.agent-panel__tracking')
-  const recenterButton = panel.querySelector('.agent-panel__recenter')
-  const openButton = panel.querySelector('.agent-panel__open')
+  const tracking = panel.querySelector('.portal-panel__tracking')
+  const recenterButton = panel.querySelector('.portal-panel__recenter')
+  const openButton = panel.querySelector('.portal-panel__open')
   const editorAccess = panel.querySelector('.portal-editor-access')
   const editorAccessToggle = panel.querySelector('.portal-editor-access__toggle')
   const editorAccessForm = panel.querySelector('.portal-editor-access__form')
   const editorAccessPin = panel.querySelector('.portal-editor-access__pin')
   const editorAccessError = panel.querySelector('.portal-editor-access__error')
   const editor = panel.querySelector('.portal-editor')
-  const form = panel.querySelector('.agent-panel__form')
-  const input = form.querySelector('input')
-
-  minimizeButton.addEventListener('click', () => {
-    const isMinimized = panel.classList.toggle('agent-panel--minimized')
-    minimizeButton.textContent = isMinimized ? 'Open' : 'Minimize'
-    minimizeButton.setAttribute('aria-expanded', String(!isMinimized))
-    minimizeButton.setAttribute('aria-label', isMinimized ? 'Open agent chat' : 'Minimize agent chat')
-  })
 
   const unlockPortalEditor = () => {
     editor.hidden = false
@@ -443,12 +365,18 @@ const buildAgentOverlay = () => {
   })
   editor.querySelector('.portal-editor__save').addEventListener('click', async () => {
     await saveWorldConfig()
-    log.innerHTML = '<p><strong>Admin:</strong> Portal world saved to backend/local storage.</p>'
+    const logElement = document.createElement('div')
+    logElement.className = 'portal-panel__log'
+    logElement.innerHTML = '<p><strong>Admin:</strong> Portal world saved to backend/local storage.</p>'
+    panel.appendChild(logElement)
   })
   editor.querySelector('.portal-editor__load').addEventListener('click', async () => {
     await loadWorldConfig()
     syncEditorControls()
-    log.innerHTML = '<p><strong>Admin:</strong> Portal world loaded and linked to the frontend portal.</p>'
+    const logElement = document.createElement('div')
+    logElement.className = 'portal-panel__log'
+    logElement.innerHTML = '<p><strong>Admin:</strong> Portal world loaded and linked to the frontend portal.</p>'
+    panel.appendChild(logElement)
   })
 
   editorControls.forEach((control) => {
@@ -456,12 +384,6 @@ const buildAgentOverlay = () => {
       editorState.transforms[editorState.target][control.dataset.kind][Number(control.dataset.axis)] = Number(control.value)
       emitEditorUpdate()
     })
-  })
-
-  window.addEventListener('portal-destination-change', (event) => {
-    const name = event.detail.name
-    destination.textContent = name
-    log.innerHTML = `<p><strong>Agent:</strong> ${destinationResponses[name]}</p>`
   })
 
   window.addEventListener('portal-tracking-change', (event) => {
@@ -473,8 +395,8 @@ const buildAgentOverlay = () => {
     panel.dataset.trackingState = event.detail.state
     tracking.querySelector('strong').textContent = labels[event.detail.state]
     tracking.querySelector('span').textContent = event.detail.canEnter
-      ? '— door portal is placed'
-      : '— waiting for a ground point'
+      ? '\u2014 door portal is placed'
+      : '\u2014 waiting for a ground point'
   })
 
   window.addEventListener('portal-placement-change', (event) => {
@@ -489,18 +411,6 @@ const buildAgentOverlay = () => {
     panel.dataset.portalState = event.detail.isInsidePortal ? 'inside' : 'outside'
     panel.querySelector('h1').textContent = status
   })
-
-  form.addEventListener('submit', (event) => {
-    event.preventDefault()
-    const question = input.value.trim()
-    if (!question) return
-
-    log.innerHTML = `
-      <p><strong>You:</strong> ${question}</p>
-      <p><strong>Agent:</strong> This prototype routes your question to the selected place. Next milestone: connect this box to a hosted LLM tool with destination context, safety filters, and citations.</p>
-    `
-    input.value = ''
-  })
 }
 
 const startOriginalPortal = () => {
@@ -508,8 +418,7 @@ const startOriginalPortal = () => {
     window.alert('AR Portal is still loading. Please try again in a moment.')
     return
   }
-  buildVrControls()
-  buildAgentOverlay()
+  buildPortalOverlay()
   document.body.classList.add('original-portal-active')
 
   XR8.addCameraPipelineModules([
@@ -529,7 +438,7 @@ const startOriginalPortal = () => {
 
 const initializeApp = () => {
   buildAdminPanel()
-  buildHomePage({onExplore: startOriginalPortal, onVrWorld: buildStandaloneVrWorld})
+  buildHomePage({onExplore: startOriginalPortal})
 }
 
 if (document.readyState === 'loading') {
