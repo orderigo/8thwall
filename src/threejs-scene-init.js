@@ -16,8 +16,9 @@ const DEFAULT_WORLD_CONFIG = {
 }
 
 const DOOR_REAL_WORLD_HEIGHT_METERS = 5.0
-const DOOR_OPEN_DISTANCE_METERS = 2.0
-const DOOR_CLOSE_DISTANCE_METERS = 2.5
+const DOOR_OPEN_DISTANCE_METERS = 1.5
+const DOOR_CLOSE_DISTANCE_METERS = 2.0
+const DOOR_OPEN_CLOSE_HYSTERESIS = 0.3
 const PORTAL_ENTRY_RADIUS = 3.5
 const PORTAL_EXIT_RADIUS = 4.05
 const PORTAL_ENTRY_DEPTH = 0.5
@@ -70,6 +71,37 @@ const playPortalEntrySound = (() => {
       oscillator.connect(gain)
       oscillator.start(now + index * 0.04)
       oscillator.stop(now + 0.95)
+    })
+  }
+})()
+
+const playDoorSound = (() => {
+  let doorAudioContext
+  return (isOpening) => {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    if (!AudioContext) return
+
+    doorAudioContext ||= new AudioContext()
+    if (doorAudioContext.state === 'suspended') doorAudioContext.resume()
+
+    const now = doorAudioContext.currentTime
+    const gain = doorAudioContext.createGain()
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.3, now + 0.03)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.8)
+    gain.connect(doorAudioContext.destination)
+
+    const baseFrequency = isOpening ? 220 : 165
+    const endFrequency = isOpening ? 440 : 82.5
+    
+    ;[baseFrequency, baseFrequency * 1.5, baseFrequency * 2].forEach((frequency, index) => {
+      const oscillator = doorAudioContext.createOscillator()
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(frequency, now)
+      oscillator.frequency.exponentialRampToValueAtTime(endFrequency * (index + 1), now + 0.6)
+      oscillator.connect(gain)
+      oscillator.start(now + index * 0.02)
+      oscillator.stop(now + 0.7)
     })
   }
 })()
@@ -374,8 +406,18 @@ export const initScenePipelineModule = () => {
         portal.userData.revealProgress += (1 - portal.userData.revealProgress) * 0.08
         portal.position.y = THREE.MathUtils.lerp(-DOOR_REAL_WORLD_HEIGHT_METERS, 0, portal.userData.revealProgress)
         const distanceToDoor = new THREE.Vector2(camera.position.x - selectedGroundPoint.x, camera.position.z - selectedGroundPoint.z).length()
-        if (!doorOpen && distanceToDoor < DOOR_OPEN_DISTANCE_METERS) setDoorOpen(true)
-        if (doorOpen && distanceToDoor > DOOR_CLOSE_DISTANCE_METERS) setDoorOpen(false)
+        
+        // Improved door logic with hysteresis
+        const openThreshold = DOOR_OPEN_DISTANCE_METERS
+        const closeThreshold = DOOR_CLOSE_DISTANCE_METERS
+        
+        if (!doorOpen && distanceToDoor < openThreshold) {
+          setDoorOpen(true)
+          playDoorSound(true) // Play open sound
+        } else if (doorOpen && distanceToDoor > closeThreshold + DOOR_OPEN_CLOSE_HYSTERESIS) {
+          setDoorOpen(false)
+          playDoorSound(false) // Play close sound
+        }
       }
 
       if (doorMixer) doorMixer.update(delta)
