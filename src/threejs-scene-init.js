@@ -3,21 +3,27 @@
 import * as THREE from 'three'
 import {LumaSplatsThree} from '@lumaai/luma-web'
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js'
+import {GLTFExporter} from 'three/examples/jsm/exporters/GLTFExporter.js'
 import doorModelUrl from './assets/lowpoly_animated_doors_blender_file.glb?url'
 
 const DEFAULT_WORLD_CONFIG = {
+  glb: {
+    url: '/src/assets/360.glb',
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+  },
+  photosphere: {
+    url: '',
+    radius: 100,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+  },
   gaussianSplat: {
-    source: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2',
+    source: '',
     position: [0, 0, -1.2],
     rotation: [0, Math.PI, 0],
     scale: [0.58, 0.58, 0.58],
-  },
-  glb: {url: '', position: [0.72, 0, -1.6], rotation: [0, 0, 0], scale: [1, 1, 1]},
-  photosphere: {
-    url: 'https://threejs.org/examples/textures/2294472375_2348d721b5_p.jpg',
-    radius: 50,
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
   },
 }
 
@@ -322,7 +328,58 @@ export const initScenePipelineModule = () => {
       portalWorld.add(photosphere)
     }
 
+    // Create mesh floor for user walking (2 feet radius)
+    const floorGeometry = new THREE.CircleGeometry(0.61, 32) // 2 feet = 0.61 meters
+    const floorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x333333,
+      roughness: 0.8,
+      metalness: 0.2,
+    })
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial)
+    floor.name = 'portal-floor'
+    floor.rotation.x = -Math.PI / 2
+    floor.position.y = -0.01 // Slightly below to avoid z-fighting
+    floor.receiveShadow = true
+    portalWorld.add(floor)
+
     gltfLoader = new GLTFLoader()
+    
+    // Load 360.glb sphere model at portal center
+    // Create a fallback sphere if 360.glb is not available
+    const create360Sphere = () => {
+      const geometry = new THREE.SphereGeometry(50, 64, 64)
+      const material = new THREE.MeshBasicMaterial({
+        color: 0x8888ff,
+        side: THREE.BackSide,
+      })
+      const sphere = new THREE.Mesh(geometry, material)
+      sphere.name = '360-sphere-fallback'
+      return sphere
+    }
+    
+    if (worldConfig.glb?.url) {
+      gltfLoader.load(worldConfig.glb.url, (gltf) => {
+        glbScene = gltf.scene
+        glbScene.name = '360-sphere-model'
+        applyTransform(glbScene, worldConfig.glb)
+        // Center the model
+        const box = new THREE.Box3().setFromObject(glbScene)
+        const center = box.getCenter(new THREE.Vector3())
+        glbScene.position.sub(center)
+        portalWorld.add(glbScene)
+      }, undefined, undefined, (error) => {
+        console.warn('Failed to load 360.glb, using fallback sphere:', error)
+        glbScene = create360Sphere()
+        applyTransform(glbScene, worldConfig.glb)
+        portalWorld.add(glbScene)
+      })
+    } else {
+      // Use fallback sphere if no URL specified
+      glbScene = create360Sphere()
+      applyTransform(glbScene, worldConfig.glb)
+      portalWorld.add(glbScene)
+    }
+    
     createPlacementMarker(scene)
     createPortal(scene)
 
@@ -409,6 +466,10 @@ export const initScenePipelineModule = () => {
               glbScene = gltf.scene
               glbScene.name = 'editable-glb-world-asset'
               applyTransform(glbScene, worldConfig.glb)
+              // Center the 360 sphere model at portal origin
+              const box = new THREE.Box3().setFromObject(glbScene)
+              const center = box.getCenter(new THREE.Vector3())
+              glbScene.position.sub(center)
               portalWorld.add(glbScene)
             })
           }
