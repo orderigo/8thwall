@@ -3,7 +3,6 @@
 import * as THREE from 'three'
 import {LumaSplatsThree} from '@lumaai/luma-web'
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js'
-import {GLTFExporter} from 'three/examples/jsm/exporters/GLTFExporter.js'
 import doorModelUrl from './assets/lowpoly_animated_doors_blender_file.glb?url'
 
 const DEFAULT_WORLD_CONFIG = {
@@ -344,40 +343,76 @@ export const initScenePipelineModule = () => {
 
     gltfLoader = new GLTFLoader()
     
-    // Load 360.glb sphere model at portal center
-    // Create a fallback sphere if 360.glb is not available
+    // Create 360 sphere model for portal world
+    // Using a large sphere with equirectangular texture for immersive experience
     const create360Sphere = () => {
+      // Create a large sphere (50m radius) for immersive 360 experience
       const geometry = new THREE.SphereGeometry(50, 64, 64)
+      
+      // Create a texture loader for the sphere
+      const textureLoader = new THREE.TextureLoader()
+      
+      // Try to load a default equirectangular texture
+      // For now, use a colorful gradient as fallback
       const material = new THREE.MeshBasicMaterial({
-        color: 0x8888ff,
-        side: THREE.BackSide,
+        color: 0x4488ff,
+        side: THREE.BackSide,  // Render inside only
       })
+      
       const sphere = new THREE.Mesh(geometry, material)
-      sphere.name = '360-sphere-fallback'
+      sphere.name = '360-sphere-model'
+      
+      // Try to load a better texture
+      textureLoader.load(
+        'https://threejs.org/examples/textures/equirectangular/park2_1k.jpg',
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace
+          material.map = texture
+          material.needsUpdate = true
+        },
+        undefined,
+        (error) => {
+          console.warn('Could not load equirectangular texture:', error)
+          // Use a different color pattern as fallback
+          material.color.set(0x8844ff)
+        }
+      )
+      
       return sphere
     }
     
+    // Always create the 360 sphere (don't wait for GLB loading)
+    glbScene = create360Sphere()
+    applyTransform(glbScene, worldConfig.glb)
+    portalWorld.add(glbScene)
+    
+    // Try to load 360.glb if available, replace the fallback
     if (worldConfig.glb?.url) {
       gltfLoader.load(worldConfig.glb.url, (gltf) => {
+        // Remove the fallback sphere
+        portalWorld.remove(glbScene)
+        
         glbScene = gltf.scene
         glbScene.name = '360-sphere-model'
         applyTransform(glbScene, worldConfig.glb)
-        // Center the model
+        
+        // Center the model at origin
         const box = new THREE.Box3().setFromObject(glbScene)
         const center = box.getCenter(new THREE.Vector3())
         glbScene.position.sub(center)
+        
+        // Scale it to be large enough for immersive experience
+        const size = box.getSize(new THREE.Vector3())
+        const maxDim = Math.max(size.x, size.y, size.z)
+        if (maxDim < 10) {
+          const scale = 50 / maxDim
+          glbScene.scale.setScalar(scale)
+        }
+        
         portalWorld.add(glbScene)
       }, undefined, undefined, (error) => {
-        console.warn('Failed to load 360.glb, using fallback sphere:', error)
-        glbScene = create360Sphere()
-        applyTransform(glbScene, worldConfig.glb)
-        portalWorld.add(glbScene)
+        console.warn('Could not load 360.glb, using fallback sphere:', error)
       })
-    } else {
-      // Use fallback sphere if no URL specified
-      glbScene = create360Sphere()
-      applyTransform(glbScene, worldConfig.glb)
-      portalWorld.add(glbScene)
     }
     
     createPlacementMarker(scene)
@@ -533,7 +568,9 @@ export const initScenePipelineModule = () => {
 
       portal.visible = portalRaised && !isInsidePortal
       if (portalWorld) {
-        portalWorld.visible = isInsidePortal
+        // Make portal world visible when door is open OR when inside
+        // This allows users to see the 360 sphere through the open door
+        portalWorld.visible = isInsidePortal || (portalRaised && doorOpen)
         portalWorld.position.copy(selectedGroundPoint)
         portalWorld.quaternion.copy(portal.quaternion)
       }
