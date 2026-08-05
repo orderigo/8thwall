@@ -6,19 +6,19 @@ import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js'
 import doorModelUrl from './assets/lowpoly_animated_doors_blender_file.glb?url'
 
 const DEFAULT_WORLD_CONFIG = {
+  photosphere: {
+    url: 'https://threejs.org/examples/textures/equirectangular/park2_1k.jpg',
+    radius: 100,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+  },
   gaussianSplat: {
-    source: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2',
+    source: '',
     position: [0, 0, -1.2],
     rotation: [0, Math.PI, 0],
     scale: [0.58, 0.58, 0.58],
   },
   glb: {url: '', position: [0.72, 0, -1.6], rotation: [0, 0, 0], scale: [1, 1, 1]},
-  photosphere: {
-    url: 'https://threejs.org/examples/textures/2294472375_2348d721b5_p.jpg',
-    radius: 50,
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
-  },
 }
 
 const DOOR_REAL_WORLD_HEIGHT_METERS = 5.0
