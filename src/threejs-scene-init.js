@@ -13,6 +13,12 @@ const DEFAULT_WORLD_CONFIG = {
     scale: [0.58, 0.58, 0.58],
   },
   glb: {url: '', position: [0.72, 0, -1.6], rotation: [0, 0, 0], scale: [1, 1, 1]},
+  photosphere: {
+    url: 'https://threejs.org/examples/textures/2294472375_2348d721b5_p.jpg',
+    radius: 50,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+  },
 }
 
 const DOOR_REAL_WORLD_HEIGHT_METERS = 5.0
@@ -128,6 +134,7 @@ export const initScenePipelineModule = () => {
   let portalWorld
   let lumaSplats
   let glbScene
+  let photosphere
   let gltfLoader
   let isInsidePortal = false
   let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
@@ -294,6 +301,27 @@ export const initScenePipelineModule = () => {
       lumaSplats.captureCubemap(renderer).then((capturedTexture) => { scene.environment = capturedTexture })
     }
 
+    // Create 360 photosphere
+    const createPhotosphere = (url, radius = 50) => {
+      const geometry = new THREE.SphereGeometry(radius, 60, 40)
+      const texture = new THREE.TextureLoader().load(url)
+      texture.colorSpace = THREE.SRGBColorSpace
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        side: THREE.BackSide,
+      })
+      const sphere = new THREE.Mesh(geometry, material)
+      sphere.name = '360-photosphere'
+      return sphere
+    }
+
+    // Add photosphere to portal world
+    if (worldConfig.photosphere?.url) {
+      photosphere = createPhotosphere(worldConfig.photosphere.url, worldConfig.photosphere.radius)
+      applyTransform(photosphere, worldConfig.photosphere)
+      portalWorld.add(photosphere)
+    }
+
     gltfLoader = new GLTFLoader()
     createPlacementMarker(scene)
     createPortal(scene)
@@ -383,6 +411,15 @@ export const initScenePipelineModule = () => {
               applyTransform(glbScene, worldConfig.glb)
               portalWorld.add(glbScene)
             })
+          }
+        }
+        if (target === 'photosphere') {
+          if (url !== undefined) worldConfig.photosphere.url = url
+          if (photosphere) applyTransform(photosphere, worldConfig.photosphere)
+          if (worldConfig.photosphere?.url && !photosphere) {
+            photosphere = createPhotosphere(worldConfig.photosphere.url, worldConfig.photosphere.radius)
+            applyTransform(photosphere, worldConfig.photosphere)
+            portalWorld.add(photosphere)
           }
         }
       })
