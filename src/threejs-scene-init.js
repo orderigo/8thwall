@@ -7,7 +7,7 @@ import doorModelUrl from './assets/lowpoly_animated_doors_blender_file.glb?url'
 
 const DEFAULT_WORLD_CONFIG = {
   photosphere: {
-    url: '/src/assets/shot-panoramic-composition-living-room.jpg',
+    url: 'https://res.cloudinary.com/lfupufmw/image/upload/v1785944695/shot-panoramic-composition-living-room_spqbyi.jpg',
     radius: 100,
     position: [0, 0, 0],
     rotation: [0, 0, 0],
@@ -494,9 +494,9 @@ export const initScenePipelineModule = () => {
 
       portal.visible = portalRaised && !isInsidePortal
       if (portalWorld) {
-        // Make portal world visible when door is open OR when inside
-        // This allows users to see the 360 sphere through the open door
-        portalWorld.visible = isInsidePortal || (portalRaised && doorOpen)
+        // Portal world (360 photosphere) should only be visible when user is inside
+        // This ensures proper separation between outside and inside
+        portalWorld.visible = isInsidePortal
         portalWorld.position.copy(selectedGroundPoint)
         portalWorld.quaternion.copy(portal.quaternion)
       }
