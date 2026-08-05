@@ -3,21 +3,20 @@
 import * as THREE from 'three'
 import {LumaSplatsThree} from '@lumaai/luma-web'
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js'
-import {GLTFExporter} from 'three/examples/jsm/exporters/GLTFExporter.js'
 import doorModelUrl from './assets/lowpoly_animated_doors_blender_file.glb?url'
 
 const DEFAULT_WORLD_CONFIG = {
-  glb: {
-    url: '/src/assets/360.glb',
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
-    scale: [1, 1, 1],
-  },
   photosphere: {
-    url: '',
+    url: '/src/assets/shot-panoramic-composition-living-room.jpg',
     radius: 100,
     position: [0, 0, 0],
     rotation: [0, 0, 0],
+  },
+  glb: {
+    url: '',
+    position: [0, 0, -1.6],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
   },
   gaussianSplat: {
     source: '',
@@ -139,7 +138,6 @@ export const initScenePipelineModule = () => {
   let portalRaised = false
   let portalWorld
   let lumaSplats
-  let glbScene
   let photosphere
   let gltfLoader
   let isInsidePortal = false
@@ -344,40 +342,11 @@ export const initScenePipelineModule = () => {
 
     gltfLoader = new GLTFLoader()
     
-    // Load 360.glb sphere model at portal center
-    // Create a fallback sphere if 360.glb is not available
-    const create360Sphere = () => {
-      const geometry = new THREE.SphereGeometry(50, 64, 64)
-      const material = new THREE.MeshBasicMaterial({
-        color: 0x8888ff,
-        side: THREE.BackSide,
-      })
-      const sphere = new THREE.Mesh(geometry, material)
-      sphere.name = '360-sphere-fallback'
-      return sphere
-    }
-    
-    if (worldConfig.glb?.url) {
-      gltfLoader.load(worldConfig.glb.url, (gltf) => {
-        glbScene = gltf.scene
-        glbScene.name = '360-sphere-model'
-        applyTransform(glbScene, worldConfig.glb)
-        // Center the model
-        const box = new THREE.Box3().setFromObject(glbScene)
-        const center = box.getCenter(new THREE.Vector3())
-        glbScene.position.sub(center)
-        portalWorld.add(glbScene)
-      }, undefined, undefined, (error) => {
-        console.warn('Failed to load 360.glb, using fallback sphere:', error)
-        glbScene = create360Sphere()
-        applyTransform(glbScene, worldConfig.glb)
-        portalWorld.add(glbScene)
-      })
-    } else {
-      // Use fallback sphere if no URL specified
-      glbScene = create360Sphere()
-      applyTransform(glbScene, worldConfig.glb)
-      portalWorld.add(glbScene)
+    // Load photosphere with equirectangular texture
+    if (worldConfig.photosphere?.url) {
+      photosphere = createPhotosphere(worldConfig.photosphere.url, worldConfig.photosphere.radius)
+      applyTransform(photosphere, worldConfig.photosphere)
+      portalWorld.add(photosphere)
     }
     
     createPlacementMarker(scene)
@@ -457,21 +426,13 @@ export const initScenePipelineModule = () => {
         if (!worldConfig[target]) return
         if (transform) worldConfig[target] = {...worldConfig[target], ...transform}
         if (target === 'gaussianSplat') applyTransform(lumaSplats, worldConfig.gaussianSplat)
-        if (target === 'glb') {
-          if (url !== undefined) worldConfig.glb.url = url
-          if (glbScene) applyTransform(glbScene, worldConfig.glb)
-          if (worldConfig.glb.url && (!glbScene || url !== undefined)) {
-            if (glbScene) portalWorld.remove(glbScene)
-            gltfLoader.load(worldConfig.glb.url, (gltf) => {
-              glbScene = gltf.scene
-              glbScene.name = 'editable-glb-world-asset'
-              applyTransform(glbScene, worldConfig.glb)
-              // Center the 360 sphere model at portal origin
-              const box = new THREE.Box3().setFromObject(glbScene)
-              const center = box.getCenter(new THREE.Vector3())
-              glbScene.position.sub(center)
-              portalWorld.add(glbScene)
-            })
+        if (target === 'photosphere') {
+          if (url !== undefined) worldConfig.photosphere.url = url
+          if (photosphere) applyTransform(photosphere, worldConfig.photosphere)
+          if (worldConfig.photosphere?.url && !photosphere) {
+            photosphere = createPhotosphere(worldConfig.photosphere.url, worldConfig.photosphere.radius)
+            applyTransform(photosphere, worldConfig.photosphere)
+            portalWorld.add(photosphere)
           }
         }
         if (target === 'photosphere') {
@@ -533,7 +494,9 @@ export const initScenePipelineModule = () => {
 
       portal.visible = portalRaised && !isInsidePortal
       if (portalWorld) {
-        portalWorld.visible = isInsidePortal
+        // Make portal world visible when door is open OR when inside
+        // This allows users to see the 360 sphere through the open door
+        portalWorld.visible = isInsidePortal || (portalRaised && doorOpen)
         portalWorld.position.copy(selectedGroundPoint)
         portalWorld.quaternion.copy(portal.quaternion)
       }
