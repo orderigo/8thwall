@@ -470,17 +470,14 @@ export const initScenePipelineModule = () => {
         portal.position.y = THREE.MathUtils.lerp(-DOOR_REAL_WORLD_HEIGHT_METERS, 0, portal.userData.revealProgress)
         const distanceToDoor = new THREE.Vector2(camera.position.x - selectedGroundPoint.x, camera.position.z - selectedGroundPoint.z).length()
         
-        // Improved door logic with hysteresis
+        // Door logic - open when close, stay open (no auto-close)
         const openThreshold = DOOR_OPEN_DISTANCE_METERS
-        const closeThreshold = DOOR_CLOSE_DISTANCE_METERS
         
         if (!doorOpen && distanceToDoor < openThreshold) {
           setDoorOpen(true)
           playDoorSound(true) // Play open sound
-        } else if (doorOpen && distanceToDoor > closeThreshold + DOOR_OPEN_CLOSE_HYSTERESIS) {
-          setDoorOpen(false)
-          playDoorSound(false) // Play close sound
         }
+        // Removed auto-close logic - door stays open until user exits portal
       }
 
       if (doorMixer) doorMixer.update(delta)
