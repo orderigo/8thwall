@@ -140,6 +140,7 @@ export const initScenePipelineModule = () => {
   let lumaSplats
   let photosphere
   let floor
+  let doorCloseTimer = null
   let gltfLoader
   let isInsidePortal = false
   let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
@@ -463,7 +464,11 @@ export const initScenePipelineModule = () => {
       if (!hasSmoothedCameraPosition) {
         smoothedCameraPosition.copy(camera.position)
         hasSmoothedCameraPosition = true
-      } else smoothedCameraPosition.lerp(camera.position, 0.18)
+      } else {
+        // Improved smoothing with adaptive lerp factor
+        const lerpFactor = delta * 8 // Adaptive smoothing based on frame rate
+        smoothedCameraPosition.lerp(camera.position, Math.min(lerpFactor, 0.5))
+      }
 
       if (portalRaised) {
         portal.userData.revealProgress += (1 - portal.userData.revealProgress) * 0.08
@@ -476,6 +481,15 @@ export const initScenePipelineModule = () => {
         if (!doorOpen && distanceToDoor < openThreshold) {
           setDoorOpen(true)
           playDoorSound(true) // Play open sound
+          
+          // Clear any existing timer
+          if (doorCloseTimer) clearTimeout(doorCloseTimer)
+          
+          // Set timer to close door after 5 minutes (300000ms)
+          doorCloseTimer = setTimeout(() => {
+            setDoorOpen(false)
+            playDoorSound(false)
+          }, 300000) // 5 minutes = 300,000ms
         }
         // Removed auto-close logic - door stays open until user exits portal
       }
