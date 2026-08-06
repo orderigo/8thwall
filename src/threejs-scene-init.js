@@ -7,7 +7,7 @@ import doorModelUrl from './assets/lowpoly_animated_doors_blender_file.glb?url'
 
 const DEFAULT_WORLD_CONFIG = {
   photosphere: {
-    url: '/src/assets/shot-panoramic-composition-living-room.jpg',
+    url: 'https://res.cloudinary.com/lfupufmw/image/upload/v1785944695/shot-panoramic-composition-living-room_spqbyi.jpg',
     radius: 100,
     position: [0, 0, 0],
     rotation: [0, 0, 0],
@@ -139,6 +139,7 @@ export const initScenePipelineModule = () => {
   let portalWorld
   let lumaSplats
   let photosphere
+  let floor
   let gltfLoader
   let isInsidePortal = false
   let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
@@ -313,6 +314,7 @@ export const initScenePipelineModule = () => {
       const material = new THREE.MeshBasicMaterial({
         map: texture,
         side: THREE.BackSide,
+        color: 0x4488ff,
       })
       const sphere = new THREE.Mesh(geometry, material)
       sphere.name = '360-photosphere'
@@ -338,6 +340,7 @@ export const initScenePipelineModule = () => {
     floor.rotation.x = -Math.PI / 2
     floor.position.y = -0.01 // Slightly below to avoid z-fighting
     floor.receiveShadow = true
+    floor.visible = false  // Start hidden, only show when inside
     portalWorld.add(floor)
 
     gltfLoader = new GLTFLoader()
@@ -346,6 +349,7 @@ export const initScenePipelineModule = () => {
     if (worldConfig.photosphere?.url) {
       photosphere = createPhotosphere(worldConfig.photosphere.url, worldConfig.photosphere.radius)
       applyTransform(photosphere, worldConfig.photosphere)
+      photosphere.visible = false  // Start hidden, only show when inside
       portalWorld.add(photosphere)
     }
     
@@ -494,9 +498,9 @@ export const initScenePipelineModule = () => {
 
       portal.visible = portalRaised && !isInsidePortal
       if (portalWorld) {
-        // Make portal world visible when door is open OR when inside
-        // This allows users to see the 360 sphere through the open door
-        portalWorld.visible = isInsidePortal || (portalRaised && doorOpen)
+        // Portal world (360 photosphere) should only be visible when user is inside
+        // This ensures proper separation between outside and inside
+        portalWorld.visible = isInsidePortal
         portalWorld.position.copy(selectedGroundPoint)
         portalWorld.quaternion.copy(portal.quaternion)
       }
