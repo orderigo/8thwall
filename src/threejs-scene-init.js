@@ -139,6 +139,7 @@ export const initScenePipelineModule = () => {
   let portalWorld
   let lumaSplats
   let photosphere
+  let floor
   let gltfLoader
   let isInsidePortal = false
   let worldConfig = JSON.parse(JSON.stringify(DEFAULT_WORLD_CONFIG))
@@ -338,6 +339,7 @@ export const initScenePipelineModule = () => {
     floor.rotation.x = -Math.PI / 2
     floor.position.y = -0.01 // Slightly below to avoid z-fighting
     floor.receiveShadow = true
+    floor.visible = false  // Start hidden, only show when inside
     portalWorld.add(floor)
 
     gltfLoader = new GLTFLoader()
@@ -346,6 +348,7 @@ export const initScenePipelineModule = () => {
     if (worldConfig.photosphere?.url) {
       photosphere = createPhotosphere(worldConfig.photosphere.url, worldConfig.photosphere.radius)
       applyTransform(photosphere, worldConfig.photosphere)
+      photosphere.visible = false  // Start hidden, only show when inside
       portalWorld.add(photosphere)
     }
     
