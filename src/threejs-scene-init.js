@@ -314,6 +314,7 @@ export const initScenePipelineModule = () => {
       const material = new THREE.MeshBasicMaterial({
         map: texture,
         side: THREE.BackSide,
+        color: 0x4488ff,
       })
       const sphere = new THREE.Mesh(geometry, material)
       sphere.name = '360-photosphere'
