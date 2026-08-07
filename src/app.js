@@ -2,6 +2,7 @@
 
 import {initScenePipelineModule} from './threejs-scene-init'
 import * as THREE from 'three'
+import {startPagodaTour} from './babylon-pagoda-tour'
 
 window.THREE = THREE
 
@@ -9,7 +10,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
 
-const buildHomePage = ({onExplore, onVRMode}) => {
+const buildHomePage = ({onExplore, onVRMode, onInteractiveTour}) => {
   const home = document.createElement('main')
   home.className = 'home-page home-page--redesigned'
   home.innerHTML = `
@@ -27,6 +28,7 @@ const buildHomePage = ({onExplore, onVRMode}) => {
           <div class="hero-card__actions">
             <button class="hero-card__button" type="button" data-action="explore">Open Door (AR Mode)</button>
             <button class="hero-card__button hero-card__button--vr" type="button" data-action="vr-mode">Open Door (VR Mode)</button>
+            <button class="hero-card__button hero-card__button--interactive" type="button" data-action="interactive-tour">3D Interactive</button>
           </div>
         </div>
         <div class="portal-preview" aria-hidden="true"><div class="portal-preview__ring"></div><div class="portal-preview__core"><span>AR<br>Portal</span></div><div class="portal-preview__orbit portal-preview__orbit--one"></div><div class="portal-preview__orbit portal-preview__orbit--two"></div></div>
@@ -50,8 +52,17 @@ const buildHomePage = ({onExplore, onVRMode}) => {
     }, 420)
   }
 
+  const launchInteractiveTour = () => {
+    home.classList.add('home-page--exiting')
+    window.setTimeout(() => {
+      home.remove()
+      onInteractiveTour()
+    }, 420)
+  }
+
   home.querySelectorAll('[data-action="explore"]').forEach((button) => button.addEventListener('click', launchAr))
   home.querySelectorAll('[data-action="vr-mode"]').forEach((button) => button.addEventListener('click', launchVR))
+  home.querySelectorAll('[data-action="interactive-tour"]').forEach((button) => button.addEventListener('click', launchInteractiveTour))
   document.body.prepend(home)
 }
 
@@ -178,7 +189,7 @@ const startVRPortal = () => {
 }
 
 const initializeApp = () => {
-  buildHomePage({onExplore: startOriginalPortal, onVRMode: startVRPortal})
+  buildHomePage({onExplore: startOriginalPortal, onVRMode: startVRPortal, onInteractiveTour: startPagodaTour})
 }
 
 if (document.readyState === 'loading') {
