@@ -449,6 +449,78 @@ body {
   display: none;
 }
 
+/* Expanded portal panel (default) */
+.portal-panel--expanded {
+  width: min(92vw, 520px);
+  padding: 16px;
+}
+
+.portal-panel--expanded .portal-panel__header h1 {
+  font-size: clamp(1.18rem, 4vw, 1.55rem);
+}
+
+.portal-panel--expanded .portal-panel__tracking {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.portal-panel--expanded .portal-panel__tracking p {
+  display: block;
+}
+
+.portal-panel--expanded .portal-panel__recenter,
+.portal-panel--expanded .portal-panel__open {
+  min-width: auto;
+  padding: 8px 10px;
+  font-size: 0.76rem;
+}
+
+.portal-panel--expanded .gesture-instruction {
+  display: block;
+}
+
+/* Minimize button */
+.portal-panel__minimize {
+  flex: none;
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.portal-panel__minimize:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Default state - start minimized */
+.portal-panel:not(.portal-panel--expanded) {
+  width: min(92vw, 320px);
+  padding: 8px;
+}
+
+.portal-panel:not(.portal-panel--expanded) .portal-panel__header h1 {
+  font-size: 0;
+}
+
+.portal-panel:not(.portal-panel--expanded) .portal-panel__tracking {
+  flex-direction: row;
+  justify-content: center;
+  gap: 8px;
+}
+
+.portal-panel:not(.portal-panel--expanded) .portal-panel__tracking p {
+  display: none;
+}
+
+.portal-panel:not(.portal-panel--expanded) .gesture-instruction {
+  display: none;
+}
+
 .portal-editor {
   margin: 12px 0;
   padding: 10px 12px;
