@@ -475,7 +475,7 @@ export const initScenePipelineModule = () => {
         portal.position.y = THREE.MathUtils.lerp(-DOOR_REAL_WORLD_HEIGHT_METERS, 0, portal.userData.revealProgress)
         const distanceToDoor = new THREE.Vector2(camera.position.x - selectedGroundPoint.x, camera.position.z - selectedGroundPoint.z).length()
         
-        // Door logic - open when close, stay open (no auto-close)
+        // Door logic - open when close, stay open (no auto-close when inside)
         const openThreshold = DOOR_OPEN_DISTANCE_METERS
         
         if (!doorOpen && distanceToDoor < openThreshold) {
@@ -485,11 +485,19 @@ export const initScenePipelineModule = () => {
           // Clear any existing timer
           if (doorCloseTimer) clearTimeout(doorCloseTimer)
           
-          // Set timer to close door after 5 minutes (300000ms)
+          // Set timer to close door after 5 minutes (only if not inside)
           doorCloseTimer = setTimeout(() => {
-            setDoorOpen(false)
-            playDoorSound(false)
+            if (!isInsidePortal) {
+              setDoorOpen(false)
+              playDoorSound(false)
+            }
           }, 300000) // 5 minutes = 300,000ms
+        }
+        
+        // Keep door open when inside portal
+        if (doorOpen && isInsidePortal && doorCloseTimer) {
+          clearTimeout(doorCloseTimer)
+          doorCloseTimer = null
         }
         // Removed auto-close logic - door stays open until user exits portal
       }
@@ -507,6 +515,7 @@ export const initScenePipelineModule = () => {
         if (isInsidePortal) playPortalEntrySound()
       }
 
+      // Hide portal door when user is inside
       portal.visible = portalRaised && !isInsidePortal
       if (portalWorld) {
         // Portal world (360 photosphere) should only be visible when user is inside
