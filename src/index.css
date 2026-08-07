@@ -1040,3 +1040,62 @@ body {
     flex: 1 1 auto;
   }
 }
+
+.portal-voice {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(124, 224, 255, 0.24);
+  border-radius: 16px;
+  background: rgba(3, 7, 17, 0.45);
+}
+
+.portal-voice__eyebrow {
+  margin: 0 0 4px;
+  color: #7ce0ff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.portal-voice__status {
+  display: block;
+  color: #f8fbff;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.portal-voice__toggle {
+  align-self: start;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 999px;
+  color: #06121f;
+  font-weight: 900;
+  background: linear-gradient(135deg, #8fffc4, #7ce0ff);
+}
+
+.portal-voice__toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.portal-voice__transcript {
+  grid-column: 1 / -1;
+  max-height: 92px;
+  overflow: auto;
+  color: #dce7ff;
+  font-size: 0.76rem;
+}
+
+.portal-voice__transcript p {
+  margin: 6px 0 0;
+}
+
+.portal-voice[data-state="listening"] {
+  border-color: rgba(143, 255, 196, 0.58);
+  box-shadow: inset 0 0 22px rgba(143, 255, 196, 0.08);
+}

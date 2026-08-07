@@ -142,6 +142,24 @@ npm run serve
 
 Home page မှာ Login/Signup လုပ်ပါ။ Admin panel ကိုဖွင့်ပြီး PIN ထည့်ပါ။ Portal view ထဲမှာ Editor access ကို unlock လုပ်ပြီး **Save backend world** / **Load backend world** ကိုနှိပ်ရင် Supabase `portal_worlds` table နဲ့ ချိတ်ပြီး frontend portal world ကို update လုပ်ပါလိမ့်မယ်။
 
+
+### Gemini Live AI Voice Agent
+
+The AR portal shows a Gemini Live AI Voice Agent panel after the visitor enters the portal world. Tap **Start Voice** inside the portal and allow microphone access to stream 16 kHz PCM microphone audio to Gemini Live and play 24 kHz PCM spoken responses.
+
+Set one of these environment variables before running the app:
+
+```env
+# Recommended for production: mint this server-side and pass only the short-lived token to the browser.
+VITE_GEMINI_LIVE_EPHEMERAL_TOKEN=your-short-lived-token
+
+# Local prototype fallback from Google AI Studio. Do not expose this in production builds.
+VITE_GEMINI_API_KEY=your-google-ai-studio-api-key
+
+# Optional override; defaults to models/gemini-2.5-flash-live-preview.
+VITE_GEMINI_LIVE_MODEL=models/gemini-2.5-flash-live-preview
+```
+
 ## Deployment
 
 Create a production build with `npm run build`, which outputs the app to the `dist` folder. Publish the generated files to your preferred static host.
