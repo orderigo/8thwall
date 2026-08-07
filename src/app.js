@@ -3,6 +3,7 @@
 import {initScenePipelineModule} from './threejs-scene-init'
 import * as THREE from 'three'
 import {startPagodaTour} from './babylon-pagoda-tour'
+import {createGeminiLiveAgent} from './gemini-live-agent'
 
 window.THREE = THREE
 
@@ -83,6 +84,14 @@ const buildPortalOverlay = () => {
       <button class="portal-panel__recenter" type="button">Choose ground point</button>
       <button class="portal-panel__open" type="button">Open Portal</button>
     </div>
+    <div class="portal-voice" data-state="idle">
+      <div>
+        <p class="portal-voice__eyebrow">Gemini Live AI Voice Agent</p>
+        <strong class="portal-voice__status">Enter the portal to activate voice guidance.</strong>
+      </div>
+      <button class="portal-voice__toggle" type="button" disabled>Start Voice</button>
+      <div class="portal-voice__transcript" aria-live="polite"></div>
+    </div>
     <div class="gesture-instruction" aria-live="polite">
       <strong>Ground tracking point</strong>
       <span>Move your phone, tap the animated ground point position, then press Open Portal.</span>
@@ -94,6 +103,28 @@ const buildPortalOverlay = () => {
   const tracking = panel.querySelector('.portal-panel__tracking')
   const recenterButton = panel.querySelector('.portal-panel__recenter')
   const openButton = panel.querySelector('.portal-panel__open')
+  const voicePanel = panel.querySelector('.portal-voice')
+  const voiceButton = panel.querySelector('.portal-voice__toggle')
+  const voiceStatus = panel.querySelector('.portal-voice__status')
+  const voiceTranscript = panel.querySelector('.portal-voice__transcript')
+  let voiceEnabled = false
+  const voiceAgent = createGeminiLiveAgent({
+    onStatus: ({state, detail}) => {
+      voicePanel.dataset.state = state
+      voiceStatus.textContent = detail
+      voiceButton.textContent = state === 'listening' || state === 'connecting' ? 'Stop Voice' : 'Start Voice'
+      voiceButton.disabled = state === 'connecting' || panel.dataset.portalState !== 'inside'
+    },
+    onTranscript: ({speaker, text}) => {
+      const line = document.createElement('p')
+      const label = document.createElement('strong')
+      label.textContent = `${speaker}:`
+      line.append(label, ` ${text}`)
+      voiceTranscript.appendChild(line)
+      while (voiceTranscript.children.length > 5) voiceTranscript.firstElementChild.remove()
+      voiceTranscript.scrollTop = voiceTranscript.scrollHeight
+    },
+  })
 
   recenterButton.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('portal-recenter-request'))
@@ -101,6 +132,21 @@ const buildPortalOverlay = () => {
 
   openButton.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('portal-open-request'))
+  })
+
+  voiceButton.addEventListener('click', async () => {
+    if (voiceEnabled) {
+      voiceEnabled = false
+      voiceAgent.stop()
+      return
+    }
+    voiceEnabled = true
+    try {
+      await voiceAgent.start()
+    } catch (error) {
+      voiceEnabled = false
+      console.error('Gemini Live voice agent failed', error)
+    }
   })
 
   window.addEventListener('portal-tracking-change', (event) => {
@@ -127,6 +173,14 @@ const buildPortalOverlay = () => {
     const status = event.detail.isInsidePortal ? 'Inside portal world' : 'Door Portal threshold'
     panel.dataset.portalState = event.detail.isInsidePortal ? 'inside' : 'outside'
     panel.querySelector('h1').textContent = status
+    voiceButton.disabled = !event.detail.isInsidePortal
+    if (event.detail.isInsidePortal) {
+      voiceStatus.textContent = 'Ready inside portal. Tap Start Voice and allow microphone access.'
+    } else {
+      voiceEnabled = false
+      voiceAgent.stop()
+      voiceStatus.textContent = 'Enter the portal to activate voice guidance.'
+    }
   })
 }
 
