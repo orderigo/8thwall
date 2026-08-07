@@ -163,6 +163,18 @@ const startVRPortal = () => {
 
   const canvas = document.getElementById('camerafeed')
   XR8.run({canvas, xrMode: 'VR'})
+  
+  // Auto-trigger portal open in VR mode
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('portal-open-request'))
+    // Auto-enter portal after opening
+    window.setTimeout(() => {
+      const event = new CustomEvent('portal-entry-change', {
+        detail: {isInsidePortal: true}
+      })
+      window.dispatchEvent(event)
+    }, 1000)
+  }, 500)
 }
 
 const initializeApp = () => {

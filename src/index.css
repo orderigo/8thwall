@@ -418,6 +418,37 @@ body {
   }
 }
 
+/* Minimized portal panel */
+.portal-panel--minimized {
+  width: min(92vw, 320px);
+  padding: 8px;
+}
+
+.portal-panel--minimized .portal-panel__header h1 {
+  font-size: 0;
+}
+
+.portal-panel--minimized .portal-panel__tracking {
+  flex-direction: row;
+  justify-content: center;
+  gap: 8px;
+}
+
+.portal-panel--minimized .portal-panel__tracking p {
+  display: none;
+}
+
+.portal-panel--minimized .portal-panel__recenter,
+.portal-panel--minimized .portal-panel__open {
+  min-width: 44px;
+  padding: 8px;
+  font-size: 0;
+}
+
+.portal-panel--minimized .gesture-instruction {
+  display: none;
+}
+
 .portal-editor {
   margin: 12px 0;
   padding: 10px 12px;
