@@ -1,6 +1,7 @@
 const LIVE_API_HOST = 'generativelanguage.googleapis.com'
 const LIVE_API_PATH = '/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent'
-const DEFAULT_MODEL = 'models/gemini-2.5-flash-live-preview'
+const LIVE_API_CONSTRAINED_PATH = '/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained'
+const DEFAULT_MODEL = 'models/gemini-3.1-flash-live-preview'
 const INPUT_SAMPLE_RATE = 16000
 const OUTPUT_SAMPLE_RATE = 24000
 const CHUNK_SIZE = 2048
@@ -11,8 +12,10 @@ const getApiCredential = () =>
 const getLiveUrl = () => {
   const credential = getApiCredential()
   if (!credential) return ''
-  const keyName = import.meta.env.VITE_GEMINI_LIVE_EPHEMERAL_TOKEN ? 'access_token' : 'key'
-  return `wss://${LIVE_API_HOST}${LIVE_API_PATH}?${keyName}=${encodeURIComponent(credential)}`
+  const usingEphemeralToken = Boolean(import.meta.env.VITE_GEMINI_LIVE_EPHEMERAL_TOKEN)
+  const keyName = usingEphemeralToken ? 'access_token' : 'key'
+  const apiPath = usingEphemeralToken ? LIVE_API_CONSTRAINED_PATH : LIVE_API_PATH
+  return `wss://${LIVE_API_HOST}${apiPath}?${keyName}=${encodeURIComponent(credential)}`
 }
 
 const floatTo16BitPcm = (input) => {
@@ -131,8 +134,15 @@ export const createGeminiLiveAgent = ({onStatus, onTranscript} = {}) => {
     stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true}})
     socket = new WebSocket(url)
     socket.addEventListener('message', handleMessage)
-    socket.addEventListener('close', () => setStatus('idle', 'Disconnected from Gemini Live.'))
-    socket.addEventListener('error', () => setStatus('error', 'Could not connect to Gemini Live.'))
+    socket.addEventListener('close', (event) => {
+      connected = false
+      started = false
+      const detail = event.reason
+        ? `Disconnected from Gemini Live: ${event.reason}`
+        : `Disconnected from Gemini Live (code ${event.code}). Check that the API key, Live API model, and origin restrictions are valid.`
+      setStatus('idle', detail)
+    })
+    socket.addEventListener('error', () => setStatus('error', 'Could not connect to Gemini Live. Check the browser console for the WebSocket close code.'))
     await new Promise((resolve, reject) => {
       socket.addEventListener('open', resolve, {once: true})
       socket.addEventListener('error', reject, {once: true})
@@ -141,8 +151,8 @@ export const createGeminiLiveAgent = ({onStatus, onTranscript} = {}) => {
     send({
       setup: {
         model: import.meta.env.VITE_GEMINI_LIVE_MODEL || DEFAULT_MODEL,
+        responseModalities: ['AUDIO'],
         generationConfig: {
-          responseModalities: ['AUDIO'],
           speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: 'Kore'}}},
         },
         systemInstruction: {
