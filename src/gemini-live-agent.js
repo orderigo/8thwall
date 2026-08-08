@@ -6,16 +6,32 @@ const INPUT_SAMPLE_RATE = 16000
 const OUTPUT_SAMPLE_RATE = 24000
 const CHUNK_SIZE = 2048
 
-const getApiCredential = () =>
-  import.meta.env.VITE_GEMINI_LIVE_EPHEMERAL_TOKEN || import.meta.env.VITE_GEMINI_API_KEY || ''
+const PLACEHOLDER_VALUES = new Set(['', 'your-short-lived-token', 'your-google-ai-studio-api-key'])
+
+const normalizeCredential = (value = '') => value.trim()
+
+const isApiKey = (credential) => credential.startsWith('AIza')
+
+const getApiCredential = () => {
+  const ephemeralToken = normalizeCredential(import.meta.env.VITE_GEMINI_LIVE_EPHEMERAL_TOKEN)
+  const apiKey = normalizeCredential(import.meta.env.VITE_GEMINI_API_KEY)
+
+  if (!PLACEHOLDER_VALUES.has(ephemeralToken)) return {type: 'ephemeralToken', value: ephemeralToken}
+  if (PLACEHOLDER_VALUES.has(apiKey)) return null
+
+  return {
+    type: isApiKey(apiKey) ? 'apiKey' : 'ephemeralToken',
+    value: apiKey,
+  }
+}
 
 const getLiveUrl = () => {
   const credential = getApiCredential()
   if (!credential) return ''
-  const usingEphemeralToken = Boolean(import.meta.env.VITE_GEMINI_LIVE_EPHEMERAL_TOKEN)
+  const usingEphemeralToken = credential.type === 'ephemeralToken'
   const keyName = usingEphemeralToken ? 'access_token' : 'key'
   const apiPath = usingEphemeralToken ? LIVE_API_CONSTRAINED_PATH : LIVE_API_PATH
-  return `wss://${LIVE_API_HOST}${apiPath}?${keyName}=${encodeURIComponent(credential)}`
+  return `wss://${LIVE_API_HOST}${apiPath}?${keyName}=${encodeURIComponent(credential.value)}`
 }
 
 const floatTo16BitPcm = (input) => {
