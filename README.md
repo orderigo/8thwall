@@ -154,11 +154,15 @@ Set one of these environment variables before running the app:
 VITE_GEMINI_LIVE_EPHEMERAL_TOKEN=your-short-lived-token
 
 # Local prototype fallback from Google AI Studio. Do not expose this in production builds.
+# Google AI Studio API keys usually start with AIza.
 VITE_GEMINI_API_KEY=your-google-ai-studio-api-key
 
-# Optional override; defaults to models/gemini-2.5-flash-live-preview.
-VITE_GEMINI_LIVE_MODEL=models/gemini-2.5-flash-live-preview
+# Optional override; defaults to models/gemini-3.1-flash-live-preview.
+VITE_GEMINI_LIVE_MODEL=models/gemini-3.1-flash-live-preview
 ```
+
+If the panel still switches back to **Disconnected**, open the browser console and check the WebSocket close code. The most common causes are an API key that is restricted to the wrong website origin, a key without Gemini API access, an expired ephemeral token, or an unsupported `VITE_GEMINI_LIVE_MODEL`. Google AI Studio API keys usually start with `AIza`; OAuth/ephemeral-style tokens must connect to the constrained Live API endpoint as `access_token`, so the app automatically treats non-`AIza` credentials as ephemeral tokens to avoid the `Expected OAuth 2 access token` authentication error.
+
 
 ## Deployment
 
